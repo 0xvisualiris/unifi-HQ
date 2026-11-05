@@ -142,14 +142,14 @@ func reloadVector() {
 func cleanName(n string) (string, error) {
 	n = strings.TrimSpace(n)
 	if !utf8.ValidString(n) {
-		return "", errors.New("ungültige Zeichen")
+		return "", errors.New("invalid characters")
 	}
 	if utf8.RuneCountInString(n) > 64 {
-		return "", errors.New("Name zu lang (max. 64 Zeichen)")
+		return "", errors.New("name too long (max. 64 characters)")
 	}
 	for _, r := range n {
 		if unicode.IsControl(r) {
-			return "", errors.New("Steuerzeichen nicht erlaubt")
+			return "", errors.New("control characters not allowed")
 		}
 	}
 	return n, nil
@@ -203,7 +203,7 @@ func main() {
 		m, err := s.load()
 		s.mu.Unlock()
 		if err != nil {
-			fail(w, 500, "hosts.csv nicht lesbar: "+err.Error())
+			fail(w, 500, "cannot read hosts.csv: "+err.Error())
 			return
 		}
 		out := make([]entry, 0, len(m))
@@ -215,12 +215,12 @@ func main() {
 	}))
 	write := func(w http.ResponseWriter, r *http.Request, ipRaw, nameRaw string) {
 		if !sameOrigin(r) {
-			fail(w, 403, "fremde Herkunft")
+			fail(w, 403, "cross-origin request rejected")
 			return
 		}
 		a, err := netip.ParseAddr(strings.TrimSpace(ipRaw))
 		if err != nil {
-			fail(w, 400, "keine gültige IP-Adresse")
+			fail(w, 400, "not a valid IP address")
 			return
 		}
 		name, err := cleanName(nameRaw)
@@ -239,13 +239,13 @@ func main() {
 			delete(m, a.String())
 		} else {
 			if _, ok := m[a.String()]; !ok && len(m) >= maxEntries {
-				fail(w, 400, "zu viele Einträge")
+				fail(w, 400, "too many entries")
 				return
 			}
 			m[a.String()] = name
 		}
 		if err := s.save(m); err != nil {
-			fail(w, 500, "Speichern fehlgeschlagen: "+err.Error())
+			fail(w, 500, "saving failed: "+err.Error())
 			return
 		}
 		reloadVector()
@@ -254,12 +254,12 @@ func main() {
 	}
 	mux.HandleFunc("PUT /api/names", auth.require(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
-			fail(w, 415, "JSON erwartet")
+			fail(w, 415, "JSON expected")
 			return
 		}
 		var e entry
 		if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&e); err != nil {
-			fail(w, 400, "ungültiges JSON")
+			fail(w, 400, "invalid JSON")
 			return
 		}
 		write(w, r, e.IP, e.Name)

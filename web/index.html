@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -10,150 +10,150 @@
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-<div id="globe" role="img" aria-label="Weltkarte mit Live-Verbindungen"></div>
-<canvas id="flat" hidden role="img" aria-label="Flache Weltkarte mit Live-Verbindungen"></canvas>
+<div id="globe" role="img" aria-label="World map with live connections"></div>
+<canvas id="flat" hidden role="img" aria-label="Flat world map with live connections"></canvas>
 <div class="flat-tip float-tooltip-kap" id="flatTip" hidden></div>
 
 <header>
   <h1>Lagezentrum<small id="gwName"></small></h1>
-  <div class="status" id="status" data-state="connecting"><span class="dot"></span><span id="statusText">Verbinde …</span></div>
-  <div class="filters" role="group" aria-label="Anzeige filtern">
-    <button class="chip" data-f="out" aria-pressed="true"><i class="c-out"></i>Raus</button>
-    <button class="chip" data-f="in" aria-pressed="true"><i class="c-in"></i>Rein</button>
-    <button class="chip" data-f="blocked" aria-pressed="false"><i class="c-blocked"></i>Abgewehrt</button>
-    <button class="chip" data-f="internal" aria-pressed="false"><i class="c-internal"></i>Intern</button>
+  <div class="status" id="status" data-state="connecting"><span class="dot"></span><span id="statusText">Connecting …</span></div>
+  <div class="filters" role="group" aria-label="Filter view">
+    <button class="chip" data-f="out" aria-pressed="true"><i class="c-out"></i>Out</button>
+    <button class="chip" data-f="in" aria-pressed="true"><i class="c-in"></i>In</button>
+    <button class="chip" data-f="blocked" aria-pressed="false"><i class="c-blocked"></i>Blocked</button>
+    <button class="chip" data-f="internal" aria-pressed="false"><i class="c-internal"></i>Internal</button>
     <button class="chip" data-f="dns" aria-pressed="false"><i class="c-mute"></i>DNS</button>
   </div>
-  <button class="tool" id="openCountries" title="Alle Länder im Überblick">Länder</button>
-  <button class="tool" id="openDevices" title="Geräte und Namen">Geräte</button>
-  <button class="tool" id="openHistory" title="Verlauf durchsuchen (/)">Verlauf</button>
-  <button class="tool icon" id="openSettings" title="Einstellungen" aria-label="Einstellungen" aria-controls="settings">⚙</button>
-  <div class="settings" id="settings" hidden role="dialog" aria-label="Einstellungen">
+  <button class="tool" id="openCountries" title="All countries at a glance">Countries</button>
+  <button class="tool" id="openDevices" title="Devices and names">Devices</button>
+  <button class="tool" id="openHistory" title="Search history (/)">History</button>
+  <button class="tool icon" id="openSettings" title="Settings" aria-label="Settings" aria-controls="settings">⚙</button>
+  <div class="settings" id="settings" hidden role="dialog" aria-label="Settings">
     <div class="set-group">
       <h3>Live</h3>
-      <label class="opt check"><input type="checkbox" id="optSmooth"> <span><b>Gleichmäßig abspielen</b><br><small>Das Gateway schickt Flows gebündelt. Puffern und im echten Takt abspielen, mit wenigen Sekunden Versatz. <span id="delayInfo"></span></small></span></label>
-      <label class="opt check"><input type="checkbox" id="optAlerts"> <span><b>Erstkontakt melden</b><br><small>Hinweis, wenn ein Gerät ein Land oder eine Firma zum ersten Mal seit 30 Tagen kontaktiert.</small></span></label>
+      <label class="opt check"><input type="checkbox" id="optSmooth"> <span><b>Smooth playback</b><br><small>The gateway sends flows in batches. Buffer them and replay at the real pace, a few seconds behind. <span id="delayInfo"></span></small></span></label>
+      <label class="opt check"><input type="checkbox" id="optAlerts"> <span><b>First-contact alerts</b><br><small>Notify when a device contacts a country or company for the first time in 30 days.</small></span></label>
     </div>
 
     <div class="set-group">
-      <h3>Oberfläche</h3>
-      <label class="opt row"><span><b>Farbschema</b></span>
-        <select id="optTheme"><option value="navy">Nachtblau</option><option value="graphite">Graphit</option><option value="black">Schwarz (OLED)</option></select></label>
-      <label class="opt row"><span><b>Richtungsfarben</b></span>
-        <select id="optPalette"><option value="default">Standard</option><option value="cb">farbenblind-freundlich</option></select></label>
-      <label class="opt row"><span><b>Schriftgröße</b></span>
-        <select id="optScale"><option value="0.9">klein</option><option value="1">normal</option><option value="1.15">groß</option><option value="1.3">sehr groß</option></select></label>
-      <label class="opt"><span><b>Deckkraft der Leisten</b> <span id="optPanelVal"></span></span>
+      <h3>Interface</h3>
+      <label class="opt row"><span><b>Color scheme</b></span>
+        <select id="optTheme"><option value="navy">Night blue</option><option value="graphite">Graphite</option><option value="black">Black (OLED)</option></select></label>
+      <label class="opt row"><span><b>Direction colors</b></span>
+        <select id="optPalette"><option value="default">Standard</option><option value="cb">Colorblind-friendly</option></select></label>
+      <label class="opt row"><span><b>Font size</b></span>
+        <select id="optScale"><option value="0.9">Small</option><option value="1">Normal</option><option value="1.15">Large</option><option value="1.3">Extra large</option></select></label>
+      <label class="opt"><span><b>Panel opacity</b> <span id="optPanelVal"></span></span>
         <input type="range" id="optPanel" min="30" max="100" step="5"></label>
-      <label class="opt check"><input type="checkbox" id="optLeft"> <span><b>Statistik links</b></span></label>
-      <label class="opt check"><input type="checkbox" id="optRight"> <span><b>Live-Ticker rechts</b></span></label>
+      <label class="opt check"><input type="checkbox" id="optLeft"> <span><b>Stats on the left</b></span></label>
+      <label class="opt check"><input type="checkbox" id="optRight"> <span><b>Live ticker on the right</b></span></label>
     </div>
 
     <div class="set-group">
-      <h3>Karte</h3>
-      <label class="opt row"><span><b>Ansicht</b></span>
-        <select id="optView"><option value="globe">Globus (3D)</option><option value="flat">flache Karte</option></select></label>
-      <label class="opt check"><input type="checkbox" id="optRotate"> <span><b>Automatisch drehen</b><br><small>Pausiert kurz, wenn du den Globus bewegst.</small></span></label>
-      <label class="opt"><span><b>Drehgeschwindigkeit</b> <span id="optRotateVal"></span></span>
+      <h3>Map</h3>
+      <label class="opt row"><span><b>View</b></span>
+        <select id="optView"><option value="globe">Globe (3D)</option><option value="flat">Flat map</option></select></label>
+      <label class="opt check"><input type="checkbox" id="optRotate"> <span><b>Auto-rotate</b><br><small>Pauses briefly when you move the globe.</small></span></label>
+      <label class="opt"><span><b>Rotation speed</b> <span id="optRotateVal"></span></span>
         <input type="range" id="optRotateSpeed" min="1" max="20" step="1"></label>
-      <label class="opt row"><span><b>Oberfläche</b></span>
-        <select id="optGlobe"><option value="night">Nachtlichter</option><option value="plain">schlicht</option></select></label>
+      <label class="opt row"><span><b>Surface</b></span>
+        <select id="optGlobe"><option value="night">Night lights</option><option value="plain">Plain</option></select></label>
       <label class="opt check"><input type="checkbox" id="optRelief"> <span><b>Relief</b></span></label>
-      <label class="opt check"><input type="checkbox" id="optStars"> <span><b>Sternenhimmel</b></span></label>
-      <label class="opt check"><input type="checkbox" id="optAtmo"> <span><b>Atmosphäre</b></span></label>
-      <label class="opt check"><input type="checkbox" id="optBorders"> <span><b>Ländergrenzen</b></span></label>
-      <label class="opt check"><input type="checkbox" id="optChoro"> <span><b>Länder einfärben</b><br><small>Je mehr Verbindungen in 24 h, desto heller das Land.</small></span></label>
-      <label class="opt check"><input type="checkbox" id="optPoints"> <span><b>Hotspots</b><br><small>Punkte für Gegenstellen der letzten 15 Minuten.</small></span></label>
-      <label class="opt check"><input type="checkbox" id="optHome"> <span><b>Zuhause beschriften</b></span></label>
-      <label class="opt row"><span><b>Bögen</b></span>
-        <select id="optStyle"><option value="strong">kräftig, Dicke nach Datenmenge</option><option value="subtle">dezent</option></select></label>
-      <label class="opt"><span><b>Bögen pro Sekunde</b> <span id="optRateVal"></span></span>
+      <label class="opt check"><input type="checkbox" id="optStars"> <span><b>Starry sky</b></span></label>
+      <label class="opt check"><input type="checkbox" id="optAtmo"> <span><b>Atmosphere</b></span></label>
+      <label class="opt check"><input type="checkbox" id="optBorders"> <span><b>Country borders</b></span></label>
+      <label class="opt check"><input type="checkbox" id="optChoro"> <span><b>Shade countries</b><br><small>The more connections in 24 h, the brighter the country.</small></span></label>
+      <label class="opt check"><input type="checkbox" id="optPoints"> <span><b>Hotspots</b><br><small>Dots for remote hosts from the last 15 minutes.</small></span></label>
+      <label class="opt check"><input type="checkbox" id="optHome"> <span><b>Label home</b></span></label>
+      <label class="opt row"><span><b>Arcs</b></span>
+        <select id="optStyle"><option value="strong">Bold, width by volume</option><option value="subtle">Subtle</option></select></label>
+      <label class="opt"><span><b>Arcs per second</b> <span id="optRateVal"></span></span>
         <input type="range" id="optRate" min="2" max="30" step="1"></label>
-      <label class="opt"><span><b>Bogenhöhe</b> <span id="optArcHVal"></span></span>
+      <label class="opt"><span><b>Arc height</b> <span id="optArcHVal"></span></span>
         <input type="range" id="optArcH" min="10" max="80" step="2"></label>
-      <small id="liteInfo" hidden>Lite-Modus (<code>?lite</code>): Relief, Sterne und Länderflächen sind aus.</small>
+      <small id="liteInfo" hidden>Lite mode (<code>?lite</code>): relief, stars and country fills are off.</small>
     </div>
 
-    <div class="opt actions"><button type="button" class="tool" id="resetView">Ansicht auf Zuhause</button><button type="button" class="tool" id="resetSettings">Alles zurücksetzen</button></div>
-    <div class="opt account" id="logoutRow" hidden><button type="button" class="tool" id="logout">Abmelden</button><small>Meldet nur diesen Browser ab.</small></div>
+    <div class="opt actions"><button type="button" class="tool" id="resetView">Center on home</button><button type="button" class="tool" id="resetSettings">Reset all</button></div>
+    <div class="opt account" id="logoutRow" hidden><button type="button" class="tool" id="logout">Log out</button><small>Logs out this browser only.</small></div>
   </div>
   <div class="clock" id="clock">--:--:--</div>
 </header>
 
 <aside class="panel" id="left">
-  <h2>Letzte 24 Stunden <span id="statsState"></span></h2>
+  <h2>Last 24 hours <span id="statsState"></span></h2>
   <div class="totals">
-    <button class="total" data-k="out" data-q="dir:out"><b id="t-out">–</b><span>raus <em id="v-out"></em></span></button>
-    <button class="total" data-k="in" data-q="dir:in"><b id="t-in">–</b><span>rein erlaubt <em id="v-in"></em></span></button>
-    <button class="total" data-k="blocked" data-q="dir:blocked"><b id="t-blocked">–</b><span>abgewehrt</span></button>
-    <button class="total" data-k="internal" data-q="dir:internal"><b id="t-internal">–</b><span>zwischen VLANs <em id="v-internal"></em></span></button>
+    <button class="total" data-k="out" data-q="dir:out"><b id="t-out">–</b><span>out <em id="v-out"></em></span></button>
+    <button class="total" data-k="in" data-q="dir:in"><b id="t-in">–</b><span>in, allowed <em id="v-in"></em></span></button>
+    <button class="total" data-k="blocked" data-q="dir:blocked"><b id="t-blocked">–</b><span>blocked</span></button>
+    <button class="total" data-k="internal" data-q="dir:internal"><b id="t-internal">–</b><span>between VLANs <em id="v-internal"></em></span></button>
   </div>
   <div class="uniq" id="uniq"></div>
 
   <section>
-    <h2><button class="link" id="sparkTitle" title="Umschalten: Verbindungen / Datenmenge">Verbindungen pro Stunde</button></h2>
+    <h2><button class="link" id="sparkTitle" title="Toggle: connections / volume">Connections per hour</button></h2>
     <div class="spark" id="spark"></div>
-    <div class="spark-axis"><span>−24 h</span><span>jetzt</span></div>
+    <div class="spark-axis"><span>−24 h</span><span>now</span></div>
   </section>
 
   <section data-needs="out">
-    <h2>Wohin dein Traffic geht</h2>
-    <ul class="bars" data-c="out" id="topOrgs"><li class="empty">Noch keine Daten</li></ul>
+    <h2>Where your traffic goes</h2>
+    <ul class="bars" data-c="out" id="topOrgs"><li class="empty">No data yet</li></ul>
   </section>
 
   <section data-needs="out">
-    <h2>Zielländer</h2>
-    <ul class="bars" data-c="out" id="topCountriesOut"><li class="empty">Noch keine Daten</li></ul>
+    <h2>Destination countries</h2>
+    <ul class="bars" data-c="out" id="topCountriesOut"><li class="empty">No data yet</li></ul>
   </section>
 
   <section data-needs="out">
-    <h2>Dienste</h2>
-    <ul class="bars" data-c="out" id="topServices"><li class="empty">Noch keine Daten</li></ul>
+    <h2>Services</h2>
+    <ul class="bars" data-c="out" id="topServices"><li class="empty">No data yet</li></ul>
   </section>
 
   <section data-needs="out">
-    <h2>Größte Verbindungen <span>Gerät → Ziel</span></h2>
-    <ul class="bars" data-c="out" id="topBiggest"><li class="empty">Noch keine Daten</li></ul>
+    <h2>Largest connections <span>device → destination</span></h2>
+    <ul class="bars" data-c="out" id="topBiggest"><li class="empty">No data yet</li></ul>
   </section>
 
   <section data-needs="out">
-    <h2>Längste Verbindungen <span>Gesamtdauer</span></h2>
-    <ul class="bars" data-c="out" id="topLongest"><li class="empty">Noch keine Daten</li></ul>
+    <h2>Longest connections <span>total duration</span></h2>
+    <ul class="bars" data-c="out" id="topLongest"><li class="empty">No data yet</li></ul>
   </section>
 
   <section data-needs="out">
-    <h2>Aktivste Geräte</h2>
-    <ul class="bars" data-c="out" id="topDevices"><li class="empty">Noch keine Daten</li></ul>
+    <h2>Most active devices</h2>
+    <ul class="bars" data-c="out" id="topDevices"><li class="empty">No data yet</li></ul>
   </section>
 
   <section data-needs="in">
-    <h2>Rein erlaubt</h2>
-    <ul class="bars" data-c="in" id="topIn"><li class="empty">Nichts – gut so</li></ul>
+    <h2>Allowed inbound</h2>
+    <ul class="bars" data-c="in" id="topIn"><li class="empty">None, as it should be</li></ul>
   </section>
 
   <section data-needs="blocked">
-    <h2>Herkunft der Anklopfer</h2>
-    <ul class="bars" data-c="blocked" id="topCountries"><li class="empty">Noch keine Daten</li></ul>
+    <h2>Where scans come from</h2>
+    <ul class="bars" data-c="blocked" id="topCountries"><li class="empty">No data yet</li></ul>
   </section>
 
   <section data-needs="blocked">
-    <h2>Gesuchte Dienste</h2>
-    <ul class="bars" data-c="blocked" id="topPorts"><li class="empty">Noch keine Daten</li></ul>
+    <h2>Targeted services</h2>
+    <ul class="bars" data-c="blocked" id="topPorts"><li class="empty">No data yet</li></ul>
   </section>
 
   <section data-needs="internal">
-    <h2>Intern gerade aktiv</h2>
-    <ul id="internal"><li class="empty">Noch nichts gesehen</li></ul>
+    <h2>Internal, active now</h2>
+    <ul id="internal"><li class="empty">Nothing seen yet</li></ul>
   </section>
 
   <section data-needs="internal">
-    <h2>Intern, 24 h</h2>
-    <ul class="bars" data-c="internal" id="topInternal"><li class="empty">Noch keine Daten</li></ul>
+    <h2>Internal, 24 h</h2>
+    <ul class="bars" data-c="internal" id="topInternal"><li class="empty">No data yet</li></ul>
   </section>
 </aside>
 
 <aside class="panel" id="right">
-  <h2>Live <span id="rate">· 0 pro Minute</span></h2>
+  <h2>Live <span id="rate">· 0 per minute</span></h2>
   <ul id="ticker" aria-live="off"></ul>
   <div class="hint" id="hint" hidden></div>
 </aside>
@@ -168,24 +168,24 @@
         <h2 id="dsTitle"></h2>
         <div class="ds-sub mono" id="dsSub"></div>
       </div>
-      <select id="dsRange" aria-label="Zeitraum">
-        <option value="1h">1 Stunde</option>
-        <option value="24h" selected>24 Stunden</option>
-        <option value="7d">7 Tage</option>
-        <option value="30d">30 Tage</option>
+      <select id="dsRange" aria-label="Time range">
+        <option value="1h">1 hour</option>
+        <option value="24h" selected>24 hours</option>
+        <option value="7d">7 days</option>
+        <option value="30d">30 days</option>
       </select>
       <button class="tool" id="dsRename" hidden>✎ Name</button>
-      <button class="tool" id="dsHistory">Im Verlauf</button>
-      <button class="tool" id="dsClose" aria-label="Schließen">✕</button>
+      <button class="tool" id="dsHistory">In history</button>
+      <button class="tool" id="dsClose" aria-label="Close">✕</button>
     </div>
     <div class="ds-body" id="dsBody">
       <div class="ds-kpis" id="dsKpis"></div>
-      <div class="ds-timeline" id="dsTimeline" aria-label="Datenmenge über die Zeit"></div>
+      <div class="ds-timeline" id="dsTimeline" aria-label="Volume over time"></div>
       <div class="ds-lists" id="dsLists"></div>
-      <h3>Verbindungen <span>Quelle → Ziel, nach Datenmenge</span></h3>
+      <h3>Connections <span>source → destination, by volume</span></h3>
       <div class="table-wrap">
         <table class="grid" id="dsPairs">
-          <thead><tr><th>Quelle</th><th>Richtung</th><th>Ziel</th><th>Land</th><th>Dienst</th><th class="num">Anzahl</th><th class="num">Daten</th><th>Zuletzt</th></tr></thead>
+          <thead><tr><th>Source</th><th>Direction</th><th>Destination</th><th>Country</th><th>Service</th><th class="num">Count</th><th class="num">Volume</th><th>Last seen</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -197,19 +197,19 @@
 <div class="drawer" id="countries" hidden role="dialog" aria-modal="true" aria-labelledby="ctyTitle">
   <div class="drawer-box">
     <div class="drawer-head">
-      <div class="ds-head"><div class="kicker">Lagebild</div><h2 id="ctyTitle">Länder</h2></div>
-      <select id="ctyRange" aria-label="Zeitraum">
-        <option value="1h">1 Stunde</option>
-        <option value="24h" selected>24 Stunden</option>
-        <option value="7d">7 Tage</option>
-        <option value="30d">30 Tage</option>
+      <div class="ds-head"><div class="kicker">Overview</div><h2 id="ctyTitle">Countries</h2></div>
+      <select id="ctyRange" aria-label="Time range">
+        <option value="1h">1 hour</option>
+        <option value="24h" selected>24 hours</option>
+        <option value="7d">7 days</option>
+        <option value="30d">30 days</option>
       </select>
-      <button class="tool" id="ctyClose" aria-label="Schließen">✕</button>
+      <button class="tool" id="ctyClose" aria-label="Close">✕</button>
     </div>
     <div class="result-info" id="ctyInfo"></div>
     <div class="table-wrap">
       <table class="grid" id="ctyTable">
-        <thead><tr><th data-sort="name">Land</th><th class="num" data-sort="n">Verbindungen</th><th class="num" data-sort="b">Daten</th><th class="num" data-sort="d">Geräte</th><th class="num" data-sort="ips">IP-Adressen</th><th class="num" data-sort="blk">Abgewehrt</th><th>Zuletzt</th></tr></thead>
+        <thead><tr><th data-sort="name">Country</th><th class="num" data-sort="n">Connections</th><th class="num" data-sort="b">Volume</th><th class="num" data-sort="d">Devices</th><th class="num" data-sort="ips">IP addresses</th><th class="num" data-sort="blk">Blocked</th><th>Last seen</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -219,20 +219,20 @@
 <div class="drawer" id="devices" hidden role="dialog" aria-modal="true" aria-labelledby="devTitle">
   <div class="drawer-box">
     <div class="drawer-head">
-      <div class="ds-head"><div class="kicker">Inventar</div><h2 id="devTitle">Geräte &amp; Namen</h2></div>
-      <input id="devFilter" type="search" placeholder="Filtern …" aria-label="Geräte filtern">
-      <select id="devRange" aria-label="Zeitraum">
-        <option value="24h" selected>24 Stunden</option>
-        <option value="7d">7 Tage</option>
-        <option value="30d">30 Tage</option>
+      <div class="ds-head"><div class="kicker">Inventory</div><h2 id="devTitle">Devices &amp; names</h2></div>
+      <input id="devFilter" type="search" placeholder="Filter …" aria-label="Filter devices">
+      <select id="devRange" aria-label="Time range">
+        <option value="24h" selected>24 hours</option>
+        <option value="7d">7 days</option>
+        <option value="30d">30 days</option>
       </select>
-      <button class="tool" id="devAdd">+ Name für IP</button>
-      <button class="tool" id="devClose" aria-label="Schließen">✕</button>
+      <button class="tool" id="devAdd">+ Name for IP</button>
+      <button class="tool" id="devClose" aria-label="Close">✕</button>
     </div>
     <div class="result-info" id="devInfo"></div>
     <div class="table-wrap">
       <table class="grid" id="devTable">
-        <thead><tr><th>Name</th><th>IP-Adresse</th><th class="num">Verbindungen</th><th class="num">Daten</th><th class="num">Gegenstellen</th><th class="num">Länder</th><th>Zuletzt</th></tr></thead>
+        <thead><tr><th>Name</th><th>IP address</th><th class="num">Connections</th><th class="num">Volume</th><th class="num">Remote hosts</th><th class="num">Countries</th><th>Last seen</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -241,48 +241,48 @@
 
 <div class="modal" id="nameDlg" hidden role="dialog" aria-modal="true" aria-labelledby="ndTitle">
   <form class="modal-box" id="ndForm" autocomplete="off">
-    <div class="kicker">Kennung vergeben</div>
-    <h2 id="ndTitle">Name für <span class="mono" id="ndIp"></span></h2>
-    <input id="ndInput" maxlength="64" placeholder="z. B. Homeassistant-PI" aria-label="Name">
+    <div class="kicker">Set label</div>
+    <h2 id="ndTitle">Name for <span class="mono" id="ndIp"></span></h2>
+    <input id="ndInput" maxlength="64" placeholder="e.g. Homeassistant-PI" aria-label="Name">
     <div class="err" id="ndErr"></div>
     <div class="modal-actions">
-      <button type="button" class="tool" id="ndDelete">Name löschen</button>
-      <button type="button" class="tool" id="ndCancel">Abbrechen</button>
-      <button type="submit" class="tool primary">Speichern</button>
+      <button type="button" class="tool" id="ndDelete">Delete name</button>
+      <button type="button" class="tool" id="ndCancel">Cancel</button>
+      <button type="submit" class="tool primary">Save</button>
     </div>
-    <small>Gilt sofort im Dashboard und für alle neuen Einträge der Historie.</small>
+    <small>Applies immediately in the dashboard and to all new history entries.</small>
   </form>
 </div>
 
 <div class="drawer" id="history" hidden role="dialog" aria-modal="true" aria-labelledby="historyTitle">
   <div class="drawer-box">
     <div class="drawer-head">
-      <h2 id="historyTitle">Verlauf</h2>
-      <a id="vmuiLink" href="select/vmui/" target="_blank" rel="noopener">VictoriaLogs-Oberfläche</a>
-      <button class="tool" id="closeHistory" aria-label="Schließen">✕</button>
+      <h2 id="historyTitle">History</h2>
+      <a id="vmuiLink" href="select/vmui/" target="_blank" rel="noopener">VictoriaLogs UI</a>
+      <button class="tool" id="closeHistory" aria-label="Close">✕</button>
     </div>
     <form id="searchForm" autocomplete="off">
-      <input id="q" type="search" placeholder="IP, Gerät, Land, Firma, Port … oder LogsQL wie r_country:CN dport:22" aria-label="Suchbegriff">
-      <select id="range" aria-label="Zeitraum">
-        <option value="1h">1 Stunde</option>
-        <option value="24h" selected>24 Stunden</option>
-        <option value="7d">7 Tage</option>
-        <option value="30d">30 Tage</option>
-        <option value="90d">90 Tage</option>
+      <input id="q" type="search" placeholder="IP, device, country, company, port … or LogsQL like r_country:CN dport:22" aria-label="Search term">
+      <select id="range" aria-label="Time range">
+        <option value="1h">1 hour</option>
+        <option value="24h" selected>24 hours</option>
+        <option value="7d">7 days</option>
+        <option value="30d">30 days</option>
+        <option value="90d">90 days</option>
       </select>
-      <select id="dirSel" aria-label="Richtung">
-        <option value="">alle Richtungen</option>
-        <option value="out">raus</option>
-        <option value="in">rein</option>
-        <option value="blocked">abgewehrt</option>
-        <option value="internal">intern</option>
+      <select id="dirSel" aria-label="Direction">
+        <option value="">All directions</option>
+        <option value="out">Out</option>
+        <option value="in">In</option>
+        <option value="blocked">Blocked</option>
+        <option value="internal">Internal</option>
       </select>
-      <button type="submit" class="tool primary">Suchen</button>
+      <button type="submit" class="tool primary">Search</button>
     </form>
-    <div class="result-info" id="resultInfo">Suchbegriffe werden im Klartext aller Einträge gesucht. Mit <code>feld:wert</code> geht es gezielt, z. B. <code>local_name:MacBook</code>, <code>dport:443</code>, <code>r_org:"Google LLC"</code>.</div>
+    <div class="result-info" id="resultInfo">Search terms match the full text of every entry. Use <code>field:value</code> to target a field, e.g. <code>local_name:MacBook</code>, <code>dport:443</code>, <code>r_org:"Google LLC"</code>.</div>
     <div class="table-wrap">
       <table id="results">
-        <thead><tr><th>Zeit</th><th>Richtung</th><th>Lokal</th><th>Gegenstelle</th><th>Ort</th><th>Dienst</th><th class="num">Daten</th><th class="num">Dauer</th></tr></thead>
+        <thead><tr><th>Time</th><th>Direction</th><th>Local</th><th>Remote</th><th>Location</th><th>Service</th><th class="num">Volume</th><th class="num">Duration</th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -290,7 +290,7 @@
 </div>
 
 <footer>
-  Klick auf ein Land, einen Punkt oder einen Listeneintrag öffnet das Dossier. IP-Geolokation: <a href="https://db-ip.com" target="_blank" rel="noopener">DB-IP.com</a> (CC BY 4.0)
+  Click a country, dot or list entry to open its dossier. IP geolocation: <a href="https://db-ip.com" target="_blank" rel="noopener">DB-IP.com</a> (CC BY 4.0)
 </footer>
 
 <script src="vendor/globe.gl.min.js"></script>

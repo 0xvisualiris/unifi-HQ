@@ -9,9 +9,6 @@ arc over a 3D globe, next to a live ticker, 24 h stats and a searchable history.
 - **Optional:** blocked scans from the internet (red) and inter-VLAN traffic (purple)
 - **LAN only, password login** (the browser stays signed in), one LXC, about 200–250 MB RAM
 
-The dashboard UI is in German. Main terms: *Raus* = outbound, *Rein* = inbound, *Abgewehrt* = blocked,
-*Intern* = inter-VLAN, *Verlauf* = history, *Länder* = countries, *Geräte* = devices.
-
 ## Contents
 
 1. [Architecture](#architecture)
@@ -205,7 +202,7 @@ history (incl. GeoIP). Then:
 | **Globe / map** | Countries are shaded by traffic in the last 24 h. Click a country or hotspot to open its dossier. The flat map (⚙ → Map → View) pans by dragging and zooms with the wheel. Both load finer borders (1:50m) and sharper texture tiles when zoomed in, only for the visible area. |
 | **Dossier** | For a country, device, company or IP: key numbers (connections, volume, IPs, devices, first/last seen, blocked), timeline, top lists and all **source → destination** pairs with service, count and volume. Range 1 h to 30 days. Click a pair for the individual connections. |
 | **Countries** | All countries as a sortable table. Click opens the dossier. |
-| **Devices** | All addresses with traffic. Add or remove names (✎), also for external IPs (*+ Name für IP*, e.g. your VPS). Names apply immediately in the dashboard and to new history entries, and searching a name also finds older entries for that IP. |
+| **Devices** | All addresses with traffic. Add or remove names (✎), also for external IPs (*+ Name for IP*, e.g. your VPS). Names apply immediately in the dashboard and to new history entries, and searching a name also finds older entries for that IP. |
 | **First contact** | Notification when a device contacts a country or company for the first time in 30 days (can be turned off; starts once there's a day of history). |
 | **History** (key `/`) | Full-text search over IP, device, country, city, provider, or plain LogsQL. |
 
@@ -344,18 +341,18 @@ the browser, not on the server, and pauses in background tabs.
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Status *Getrennt* (disconnected) | collector not running | `docker compose ps`, `docker compose logs collector`; if GeoIP is missing: `./lagezentrum.sh geoip` |
-| *Live · seit 2 min keine Daten* | NetFlow not arriving | check collector IP/port in UniFi; `apt -y install tcpdump && tcpdump -ni eth0 udp port 2055` |
+| Status *Disconnected* | collector not running | `docker compose ps`, `docker compose logs collector`; if GeoIP is missing: `./lagezentrum.sh geoip` |
+| *Live · no data for 2 min* | NetFlow not arriving | check collector IP/port in UniFi; `apt -y install tcpdump && tcpdump -ni eth0 udp port 2055` |
 | NetFlow arrives but nothing shows | sender not allowed | `ALLOWED_SENDERS` must be the IP the gateway sends from (see tcpdump) |
 | No red arcs | Blocked filter off, no syslog, or rule without logging | enable the chip; `./lagezentrum.sh test`; check rule 3C |
 | CN/RU missing from red arcs | region blocking hits before the rule | see note in 3C |
 | Lots of inbound from your own IP | `WAN_IP` outdated | update `.env`, `docker compose up -d` |
 | Own devices shown as foreign | IPv6 prefix missing | set `LOCAL_EXTRA_NETS` |
-| Stats show *Historie nicht erreichbar* | VictoriaLogs down | `docker compose logs victorialogs` |
+| Stats show *history unavailable* | VictoriaLogs down | `docker compose logs victorialogs` |
 | Dashboard unreachable from LAN | client not in `ALLOWED_CLIENTS` | add e.g. Tailscale (100.64/10) or public IPv6 |
 | Globe stutters on a Pi kiosk | weak GPU | append `?lite` to the URL |
 | Forgot password | | `./lagezentrum.sh password` sets a new one |
-| Login says *Zu viele Fehlversuche* | locked after 5 failures | wait (max 15 min) or `docker compose restart api` |
+| Login says *Too many failed attempts* | locked after 5 failures | wait (max 15 min) or `docker compose restart api` |
 | *502* everywhere | API not running, Caddy lets no one through without it | `docker compose ps`, `docker compose logs api` |
 | Login works, then back to login page | browser blocks cookies for the LXC IP | allow cookies for `http://<LXC-IP>:8080` |
 

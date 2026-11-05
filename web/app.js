@@ -10,7 +10,7 @@
 
   // ---------- Einstellungen ----------
   const CONFIG = {
-    home: { lat: 50.11, lng: 8.68, label: 'Zuhause' },
+    home: { lat: 50.11, lng: 8.68, label: 'Home' },
     gateway: '',
     wsUrl: (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws',
     vlUrl: 'select/logsql/query',
@@ -28,33 +28,34 @@
     cb: { out: '#56b4e9', in: '#f0e442', blocked: '#e8743b', internal: '#cc79a7' }
   };
   const COLORS = Object.assign({}, PALETTES.default);
-  const VERB = { out: 'raus', in: 'rein', blocked: 'abgewehrt', internal: 'intern' };
-  const PORTS = { 20:'FTP-Daten', 21:'FTP', 22:'SSH', 23:'Telnet', 25:'SMTP', 53:'DNS', 67:'DHCP', 69:'TFTP', 80:'HTTP', 81:'HTTP-Alt',
+  const VERB = { out: 'out', in: 'in', blocked: 'blocked', internal: 'internal' };
+  const PORTS = { 20:'FTP data', 21:'FTP', 22:'SSH', 23:'Telnet', 25:'SMTP', 53:'DNS', 67:'DHCP', 69:'TFTP', 80:'HTTP', 81:'HTTP-Alt',
     88:'Kerberos', 110:'POP3', 111:'RPC', 119:'NNTP', 123:'NTP', 135:'MS-RPC', 137:'NetBIOS', 138:'NetBIOS', 139:'NetBIOS', 143:'IMAP',
     161:'SNMP', 179:'BGP', 389:'LDAP', 443:'HTTPS', 445:'SMB', 465:'SMTPS', 500:'IKE', 502:'Modbus', 514:'Syslog', 515:'LPD',
-    554:'RTSP', 587:'SMTP', 623:'IPMI', 631:'IPP', 636:'LDAPS', 853:'DNS über TLS', 873:'rsync', 993:'IMAPS', 995:'POP3S',
+    554:'RTSP', 587:'SMTP', 623:'IPMI', 631:'IPP', 636:'LDAPS', 853:'DNS over TLS', 873:'rsync', 993:'IMAPS', 995:'POP3S',
     1080:'SOCKS', 1194:'OpenVPN', 1433:'MSSQL', 1521:'Oracle', 1723:'PPTP', 1883:'MQTT', 1900:'UPnP', 2049:'NFS', 2222:'SSH-Alt',
     2323:'Telnet', 2375:'Docker', 2376:'Docker', 3000:'Grafana', 3128:'Proxy', 3306:'MySQL', 3389:'RDP', 3478:'STUN', 4500:'IPsec',
     5000:'UPnP/Synology', 5060:'SIP', 5222:'XMPP', 5353:'mDNS', 5432:'PostgreSQL', 5555:'ADB', 5683:'CoAP', 5900:'VNC', 5985:'WinRM',
     6379:'Redis', 6443:'Kubernetes', 7547:'TR-069', 7844:'Cloudflare Tunnel', 8000:'HTTP-Alt', 8006:'Proxmox', 8080:'HTTP-Alt',
     8081:'HTTP-Alt', 8088:'HTTP-Alt', 8123:'Home Assistant', 8291:'MikroTik', 8443:'HTTPS-Alt', 8883:'MQTT/TLS', 8888:'HTTP-Alt',
-    9000:'HTTP-Alt', 9090:'Prometheus', 9100:'Drucker', 9200:'Elasticsearch', 10000:'Webmin', 11211:'Memcached', 25565:'Minecraft',
+    9000:'HTTP-Alt', 9090:'Prometheus', 9100:'Printer', 9200:'Elasticsearch', 10000:'Webmin', 11211:'Memcached', 25565:'Minecraft',
     27017:'MongoDB', 37777:'Dahua', 49152:'UPnP', 51820:'WireGuard' };
 
   const params = new URLSearchParams(location.search);
   // ?lite: für schwache Anzeigegeräte (Pi-Kiosk) – ohne Relief, Sterne und mit weniger Bögen
   const lite = params.has('lite');
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const nf = new Intl.NumberFormat('de-DE');
-  const regionNames = (() => { try { return new Intl.DisplayNames(['de'], { type: 'region' }); } catch { return null; } })();
+  const LOCALE = 'en-GB';   // English labels, 24-hour clock and day-first dates
+  const nf = new Intl.NumberFormat(LOCALE);
+  const regionNames = (() => { try { return new Intl.DisplayNames(['en'], { type: 'region' }); } catch { return null; } })();
   const $ = id => document.getElementById(id);
   const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
   const rgba = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; };
   const flag = cc => (typeof cc === 'string' && /^[A-Za-z]{2}$/.test(cc)) ? String.fromCodePoint(...[...cc.toUpperCase()].map(c => 127397 + c.charCodeAt(0))) : '·';
   const country = (cc, fallback) => { if (cc && regionNames) { try { return regionNames.of(String(cc).toUpperCase()); } catch {} } return fallback || cc || ''; };
   const portName = p => { p = +p || 0; return p === 0 ? '–' : PORTS[p] ? `${PORTS[p]} (${p})` : `Port ${p}`; };
-  const fmtBytes = b => { b = +b || 0; const u = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']; let i = 0; while (b >= 1024 && i < 5) { b /= 1024; i++; } return (i ? b.toFixed(b < 10 ? 1 : 0).replace('.', ',') : b) + ' ' + u[i]; };
-  const fmtNum = n => { n = +n || 0; return n >= 1e6 ? (n / 1e6).toFixed(1).replace('.', ',') + ' Mio' : nf.format(n); };
+  const fmtBytes = b => { b = +b || 0; const u = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']; let i = 0; while (b >= 1024 && i < 5) { b /= 1024; i++; } return (i ? b.toFixed(b < 10 ? 1 : 0) : b) + ' ' + u[i]; };
+  const fmtNum = n => { n = +n || 0; return n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : nf.format(n); };
   const store = {
     get(k, d) { try { const v = localStorage.getItem('lz.' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
     set(k, v) { try { localStorage.setItem('lz.' + k, JSON.stringify(v)); } catch {} }
@@ -121,7 +122,7 @@
 
   function initGlobe() {
     if (typeof Globe !== 'function') {
-      showHint('Die 3D-Bibliothek konnte nicht geladen werden (vendor/globe.gl.min.js).');
+      showHint('Could not load the 3D library (vendor/globe.gl.min.js).');
       return;
     }
     try {
@@ -292,32 +293,32 @@
 
   function makeItem(e) {
     const li = el('li', 'fresh'); li.dataset.dir = e.dir; li.tabIndex = 0;
-    const time = el('time', null, new Date(e.ts).toLocaleTimeString('de-DE'));
+    const time = el('time', null, new Date(e.ts).toLocaleTimeString(LOCALE));
     const body = el('div');
     const where = el('div', 'where');
     const what = el('div', 'what');
     const verb = el('span', 'verb', VERB[e.dir] + ' ');
-    if (e.isNew) where.append(el('span', 'badge', 'NEU'));
+    if (e.isNew) where.append(el('span', 'badge', 'NEW'));
     const local = e.local_name || e.local_ip;
     if (e.dir === 'internal') {
       where.append(verb, `${local} → ${e.remote_name || e.remote_ip}`);
       what.textContent = [portName(e.dport), e.proto].filter(Boolean).join(' · ');
     } else {
-      const place = [e.r_city, country(e.r_country, e.r_country_name)].filter(Boolean).join(', ') || 'unbekannter Ort';
+      const place = [e.r_city, country(e.r_country, e.r_country_name)].filter(Boolean).join(', ') || 'unknown location';
       where.append(verb, `${flag(e.r_country)} ${place}`);
       const parts = [e.remote_ip, portName(e.dport), e.r_org];
       if (e.dir !== 'blocked') parts.push(local);
       what.textContent = parts.filter(Boolean).join(' · ');
     }
-    li.title = e.rule ? `Regel: ${e.rule}` : 'Klick: hinzoomen · Doppelklick: Verlauf dieser IP';
+    li.title = e.rule ? `Rule: ${e.rule}` : 'Click: zoom in · Double-click: history for this IP';
     // Aktionen beim Überfahren: Name vergeben, Dossiers
     const acts = el('div', 'acts');
     const act = (txt, title, fn) => { const b = el('button', null, txt); b.type = 'button'; b.title = title; b.addEventListener('click', ev => { ev.stopPropagation(); fn(); }); acts.append(b); };
-    if (e.dir !== 'blocked') act('✎', `Namen für ${e.local_ip} vergeben`, () => editName(e.local_ip));
-    if (e.dir !== 'blocked' && e.dir !== 'internal') act('Gerät', 'Dossier dieses Geräts', () => openDossier('device', e.local_ip));
-    if (e.r_country) act('Land', 'Dossier dieses Landes', () => openDossier('country', e.r_country));
-    if (e.r_org) act('Firma', 'Dossier dieser Firma', () => openDossier('org', e.r_org));
-    act('IP', 'Dossier dieser Gegenstelle', () => openDossier('ip', e.remote_ip));
+    if (e.dir !== 'blocked') act('✎', `Name ${e.local_ip}`, () => editName(e.local_ip));
+    if (e.dir !== 'blocked' && e.dir !== 'internal') act('Device', 'Dossier for this device', () => openDossier('device', e.local_ip));
+    if (e.r_country) act('Country', 'Dossier for this country', () => openDossier('country', e.r_country));
+    if (e.r_org) act('Company', 'Dossier for this company', () => openDossier('org', e.r_org));
+    act('IP', 'Dossier for this remote host', () => openDossier('ip', e.remote_ip));
     li.append(acts);
     const meta = el('div', 'meta');
     e.metaEl = meta; renderMeta(e);
@@ -354,11 +355,11 @@
     while (stamps.length && stamps[0] < cutoff) stamps.shift();
     while (byteStamps.length && byteStamps[0][0] < cutoff) byteStamps.shift();
     const perMin = byteStamps.reduce((a, b) => a + b[1], 0);
-    $('rate').textContent = `· ${nf.format(stamps.length)} pro Minute · ${fmtBytes(perMin)}/min`;
-    $('clock').textContent = new Date().toLocaleTimeString('de-DE');
+    $('rate').textContent = `· ${nf.format(stamps.length)} per minute · ${fmtBytes(perMin)}/min`;
+    $('clock').textContent = new Date().toLocaleTimeString(LOCALE);
     if (ws && ws.readyState === 1) {
       const quiet = Date.now() - lastEventAt > 120000;
-      setStatus(quiet ? 'idle' : 'live', quiet ? 'Live · seit 2 min keine Daten' : 'Live');
+      setStatus(quiet ? 'idle' : 'live', quiet ? 'Live · no data for 2 min' : 'Live');
     }
   }, 1000);
 
@@ -366,7 +367,7 @@
     if (!filters.internal) return;
     const ul = $('internal');
     const rows = [...internalSeen.values()].sort((a, b) => b.last - a.last).slice(0, 8);
-    if (!rows.length) { ul.replaceChildren(el('li', 'empty', 'Noch nichts gesehen')); return; }
+    if (!rows.length) { ul.replaceChildren(el('li', 'empty', 'Nothing seen yet')); return; }
     ul.replaceChildren(...rows.map(r => {
       const li = el('li');
       li.append(el('span', null, `${r.from} → ${r.to} · ${portName(r.port)}`), el('span', null, `${nf.format(r.count)}×`));
@@ -417,7 +418,7 @@
     const sorted = lags.slice().sort((a, b) => a - b);
     const p90 = sorted[Math.floor(sorted.length * 0.9)];
     playDelay = Math.max(1000, Math.min(60000, p90 + 800));
-    const info = $('delayInfo'); if (info) info.textContent = settings.smooth ? `Versatz zurzeit ${Math.round(playDelay / 1000)} s` : '';
+    const info = $('delayInfo'); if (info) info.textContent = settings.smooth ? `Current delay ${Math.round(playDelay / 1000)} s` : '';
   }, 2000);
 
   setInterval(() => {
@@ -459,7 +460,7 @@
     return (await r.text()).trim().split('\n').filter(Boolean).map(l => JSON.parse(l));
   }
 
-  function renderBars(ul, rows, label, value, fmt, query, emptyText = 'Noch keine Daten', open) {
+  function renderBars(ul, rows, label, value, fmt, query, emptyText = 'No data yet', open) {
     fmt = fmt || (v => nf.format(v));
     if (!rows.length) { ul.replaceChildren(el('li', 'empty', emptyText)); return; }
     const max = Math.max(...rows.map(r => +r[value] || 0)) || 1;
@@ -490,14 +491,14 @@
   function renderSpark() {
     const src = sparkMode === 'bytes' ? hoursBytes : hours;
     const fmt = sparkMode === 'bytes' ? fmtBytes : (v => nf.format(v));
-    $('sparkTitle').textContent = sparkMode === 'bytes' ? 'Datenmenge pro Stunde' : 'Verbindungen pro Stunde';
+    $('sparkTitle').textContent = sparkMode === 'bytes' ? 'Volume per hour' : 'Connections per hour';
     const dirs = ['out', 'in', 'blocked', 'internal'].filter(d => filters[d] && !(sparkMode === 'bytes' && d === 'blocked'));
     const sums = new Array(24).fill(0);
     dirs.forEach(d => (src[d] || []).forEach((v, i) => { sums[i] += v || 0; }));
     const max = Math.max(1, ...sums);
     $('spark').replaceChildren(...sums.map((sum, i) => {
       const col = el('div', 'col');
-      col.title = `${23 - i ? '−' + (23 - i) + ' h' : 'aktuelle Stunde'}: ` + dirs.map(d => `${VERB[d]} ${fmt((src[d] || [])[i] || 0)}`).join(', ');
+      col.title = `${23 - i ? '−' + (23 - i) + ' h' : 'current hour'}: ` + dirs.map(d => `${VERB[d]} ${fmt((src[d] || [])[i] || 0)}`).join(', ');
       dirs.forEach(d => {
         const v = (src[d] || [])[i] || 0;
         if (!v) return;
@@ -550,26 +551,26 @@
       res.hours.forEach(r => { const idx = 23 - Math.round((hourStart - Date.parse(r._time)) / 3600000);
         if (hours[r.dir] && idx >= 0 && idx < 24) { hours[r.dir][idx] += +r.hits || 0; hoursBytes[r.dir][idx] += +r.bytes || 0; } });
       const u = res.uniq[0] || {};
-      $('uniq').textContent = `${fmtNum(u.r)} Ziele · ${fmtNum(u.o)} Firmen · ${fmtNum(u.c)} Länder · ${fmtNum(u.l)} Geräte`;
+      $('uniq').textContent = `${fmtNum(u.r)} destinations · ${fmtNum(u.o)} companies · ${fmtNum(u.c)} countries · ${fmtNum(u.l)} devices`;
       renderSpark();
 
       countryStats.clear(); res.cAll.forEach(r => countryStats.set(r.r_country, { n: +r.n || 0, b: +r.b || 0 })); refreshPolys();
       renderBars($('topOrgs'), res.orgs, r => r.r_org, 'v', fmtBytes, null, undefined, r => ['org', r.r_org]);
-      renderBars($('topCountriesOut'), res.cOut, r => `${flag(r.r_country)} ${country(r.r_country, r.r_country_name) || 'unbekannt'}`, 'v', null, null, undefined, r => ['country', r.r_country]);
+      renderBars($('topCountriesOut'), res.cOut, r => `${flag(r.r_country)} ${country(r.r_country, r.r_country_name) || 'unknown'}`, 'v', null, null, undefined, r => ['country', r.r_country]);
       renderBars($('topDevices'), res.devices, r => nameOf(r.local_ip, r.local_name), 'v', fmtBytes, null, undefined, r => ['device', r.local_ip]);
       renderBars($('topServices'), res.services, r => `${portName(+r.dport)} ${r.proto || ''}`, 'v', null, r => [`dport:${+r.dport || 0}`, 'out']);
       const pair = r => `${nameOf(r.local_ip, r.local_name)} → ${nameOf(r.remote_ip, r.r_org)}`;
       renderBars($('topBiggest'), res.biggest, pair, 'v', fmtBytes, r => [`local_ip:${lq(r.local_ip)} remote_ip:${lq(r.remote_ip)}`, 'out']);
       renderBars($('topLongest'), res.longest, pair, 'v', fmtDur, r => [`local_ip:${lq(r.local_ip)} remote_ip:${lq(r.remote_ip)}`, 'out']);
-      renderBars($('topIn'), res.inbound, r => `${portName(+r.dport)} ${r.proto || ''}`, 'v', null, r => [`dport:${+r.dport || 0}`, 'in'], 'Nichts – gut so');
-      if (res.cBlk) renderBars($('topCountries'), res.cBlk, r => `${flag(r.r_country)} ${country(r.r_country, r.r_country_name) || 'unbekannt'}`, 'v', null, null, undefined, r => ['country', r.r_country]);
+      renderBars($('topIn'), res.inbound, r => `${portName(+r.dport)} ${r.proto || ''}`, 'v', null, r => [`dport:${+r.dport || 0}`, 'in'], 'None, as it should be');
+      if (res.cBlk) renderBars($('topCountries'), res.cBlk, r => `${flag(r.r_country)} ${country(r.r_country, r.r_country_name) || 'unknown'}`, 'v', null, null, undefined, r => ['country', r.r_country]);
       if (res.ports) renderBars($('topPorts'), res.ports, r => portName(+r.dport), 'v', null, r => [`dport:${+r.dport || 0}`, 'blocked']);
       if (res.internal) renderBars($('topInternal'), res.internal, r => `${nameOf(r.local_ip, r.local_name)} → ${nameOf(r.remote_ip, r.remote_name)} · ${portName(+r.dport)}`, 'v', null,
         r => [`local_ip:${lq(r.local_ip)} remote_ip:${lq(r.remote_ip)} dport:${+r.dport || 0}`, 'internal']);
       statsState.textContent = '';
     } catch (err) {
-      console.warn('Statistik nicht geladen:', err);
-      statsState.textContent = '· Historie nicht erreichbar';
+      console.warn('Stats not loaded:', err);
+      statsState.textContent = '· history unavailable';
     }
   }
 
@@ -626,13 +627,13 @@
     const q = buildQuery();
     const seq = ++searchSeq;
     info.classList.remove('err');
-    info.textContent = 'Suche …';
+    info.textContent = 'Searching …';
     try {
       const rows = isDemo ? demoSearch() : await vl(q, CONFIG.historyLimit);
       if (seq !== searchSeq) return;
       renderResults(rows);
       info.replaceChildren(
-        `${nf.format(rows.length)} Treffer` + (rows.length >= CONFIG.historyLimit ? ` (die neuesten ${CONFIG.historyLimit})` : '') + ' · Abfrage: ',
+        `${nf.format(rows.length)} results` + (rows.length >= CONFIG.historyLimit ? ` (newest ${CONFIG.historyLimit})` : '') + ' · Query: ',
         el('code', null, q)
       );
       $('vmuiLink').href = 'select/vmui/#/?query=' + encodeURIComponent(q);
@@ -648,7 +649,7 @@
     tbody.replaceChildren(...rows.map(r => {
       const tr = el('tr');
       const ts = r._time ? new Date(r._time) : null;
-      const tdTime = el('td', 'mono', ts ? ts.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '');
+      const tdTime = el('td', 'mono', ts ? ts.toLocaleString(LOCALE, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '');
       const tdDir = el('td', null, VERB[r.dir] || r.dir || ''); tdDir.dataset.dir = r.dir || '';
       const tdLocal = el('td'); const ln = nameOf(r.local_ip, r.local_name); tdLocal.append(ln);
       if (ln !== r.local_ip) tdLocal.append(' ', el('small', null, r.local_ip));
@@ -659,7 +660,7 @@
       const place = r.dir === 'internal' ? '' : `${flag(r.r_country)} ${[r.r_city, country(r.r_country, r.r_country_name)].filter(Boolean).join(', ')}`;
       const tdPlace = el('td', null, place);
       const tdSvc = el('td', 'mono', `${portName(r.dport)}${r.proto ? ' ' + r.proto : ''}`);
-      if (r.rule) tdSvc.title = `Regel: ${r.rule}`;
+      if (r.rule) tdSvc.title = `Rule: ${r.rule}`;
       const tdBytes = el('td', 'num', r.dir === 'blocked' ? '' : fmtBytes(r.bytes));
       const tdDur = el('td', 'num', fmtDur(r.duration_ms));
       tr.append(tdTime, tdDir, tdLocal, tdRemote, tdPlace, tdSvc, tdBytes, tdDur);
@@ -673,13 +674,13 @@
   const setStatus = (state, text) => { if (statusEl.dataset.state !== state || statusText.textContent !== text) { statusEl.dataset.state = state; statusText.textContent = text; } };
   function showHint(text, withDemo) {
     hint.hidden = false; hint.replaceChildren(text);
-    if (withDemo) { const b = el('button', null, 'Demo starten'); b.addEventListener('click', startDemo); hint.append(b); }
+    if (withDemo) { const b = el('button', null, 'Start demo'); b.addEventListener('click', startDemo); hint.append(b); }
   }
   let ws = null, fails = 0, demoTimer = null, reconnectTimer = null;
 
   function connect() {
     clearTimeout(reconnectTimer);
-    setStatus('connecting', 'Verbinde …');
+    setStatus('connecting', 'Connecting …');
     try { ws = new WebSocket(CONFIG.wsUrl); } catch { return scheduleReconnect(); }
     ws.onopen = () => { fails = 0; hint.hidden = true; lastEventAt = Date.now(); setStatus('live', 'Live'); };
     ws.onmessage = m => { try { handle(JSON.parse(m.data)); } catch {} };
@@ -689,22 +690,22 @@
   function scheduleReconnect() {
     fails++;
     const wait = Math.min(30, 2 ** Math.min(fails, 5));
-    setStatus('down', `Getrennt · neuer Versuch in ${wait} s`);
+    setStatus('down', `Disconnected · retrying in ${wait} s`);
     if (fails >= 2) checkSession();   // WebSocket meldet 401 nicht – Sitzung gezielt prüfen
-    if (fails >= 3) showHint('Kein Live-Stream unter /ws. Läuft der Collector? (docker compose ps)', true);
+    if (fails >= 3) showHint('No live stream at /ws. Is the collector running? (docker compose ps)', true);
     reconnectTimer = setTimeout(() => { if (!demoTimer) connect(); }, wait * 1000);
   }
 
   // ---------- Demo-Modus ----------
   const SRC_BLOCK = [
-    ['CN','Peking',39.9,116.4,'China Telecom',9], ['CN','Shanghai',31.2,121.5,'China Unicom',7],
-    ['CN','Guangzhou',23.1,113.3,'Tencent Cloud',5], ['RU','Moskau',55.75,37.6,'Selectel',6],
-    ['RU','Sankt Petersburg',59.9,30.3,'Rostelecom',3], ['US','Ashburn',39.0,-77.5,'Amazon AWS',6],
+    ['CN','Beijing',39.9,116.4,'China Telecom',9], ['CN','Shanghai',31.2,121.5,'China Unicom',7],
+    ['CN','Guangzhou',23.1,113.3,'Tencent Cloud',5], ['RU','Moscow',55.75,37.6,'Selectel',6],
+    ['RU','Saint Petersburg',59.9,30.3,'Rostelecom',3], ['US','Ashburn',39.0,-77.5,'Amazon AWS',6],
     ['US','San Jose',37.3,-121.9,'Censys',4], ['US','Chicago',41.9,-87.6,'Shodan',3],
     ['NL','Amsterdam',52.37,4.9,'DigitalOcean',5], ['BG','Sofia',42.7,23.3,'Neterra',3],
     ['BR','São Paulo',-23.5,-46.6,'Vivo',3], ['IN','Mumbai',19.1,72.9,'Reliance Jio',3],
     ['VN','Hanoi',21.0,105.8,'VNPT',2], ['KR','Seoul',37.6,127.0,'KT Corp',2],
-    ['IR','Teheran',35.7,51.4,'TCI',2], ['SG','Singapur',1.35,103.8,'Alibaba Cloud',2],
+    ['IR','Tehran',35.7,51.4,'TCI',2], ['SG','Singapore',1.35,103.8,'Alibaba Cloud',2],
     ['DE','Falkenstein',50.5,12.4,'Hetzner',3], ['PR','San Juan',18.47,-66.1,'Liberty',1]
   ];
   const DST_OUT = [
@@ -712,8 +713,8 @@
     ['US','Cupertino',37.3,-122.0,'Apple Inc.',5,443], ['IE','Dublin',53.35,-6.26,'Microsoft',4,443],
     ['SE','Stockholm',59.33,18.07,'Spotify',3,443], ['US','San Francisco',37.77,-122.42,'GitHub',3,443],
     ['US','Ashburn',39.0,-77.5,'Ubiquiti Cloud',2,443], ['US','Boardman',45.8,-119.7,'Nabu Casa',2,443],
-    ['DE','Falkenstein',50.5,12.4,'Hetzner',2,443], ['DE','Frankfurt am Main',50.11,8.68,'Cloudflare',5,7844],
-    ['JP','Tokio',35.68,139.7,'Nintendo',1,443], ['US','Mountain View',37.4,-122.1,'Google LLC',3,53]
+    ['DE','Falkenstein',50.5,12.4,'Hetzner',2,443], ['DE','Frankfurt',50.11,8.68,'Cloudflare',5,7844],
+    ['JP','Tokyo',35.68,139.7,'Nintendo',1,443], ['US','Mountain View',37.4,-122.1,'Google LLC',3,53]
   ];
   const LOCALS = ['homelable', 'Homeassistant-PI', 'MacBook', 'iPhone', 'QuantumGateway (WAN)'];
   const SCAN_PORTS = [[22,10],[23,5],[3389,6],[80,4],[443,3],[445,4],[8080,3],[5900,2],[1433,2],[7547,2],[6379,1],[8291,1],[2323,2]];
@@ -738,7 +739,7 @@
         const port = n > 1 ? pickW(SCAN_PORTS, 1)[0] : p;
         const e = { kind: 'blocked', dir: 'blocked', bdir: 'in', leg: 'req', proto: 'TCP', dport: port, remote_ip: ip,
           local_ip: '217.230.40.237', local_name: 'QuantumGateway (WAN)', r_country: s[0], r_city: s[1],
-          r_lat: jitter(s[2]), r_lon: jitter(s[3]), r_org: s[4], rule: 'Anklopfer loggen' };
+          r_lat: jitter(s[2]), r_lon: jitter(s[3]), r_org: s[4], rule: 'Log scanners' };
         handle(e); remember(e);
         demo.totals.blocked.hits++; add(demo.cBlk, s[0], 'v', 1, { r_country: s[0] }); add(demo.ports, port, 'v', 1, { dport: port });
         hours.blocked[23]++;
@@ -764,7 +765,7 @@
       demo.totals.internal.hits++; hours.internal[23]++;
     } else {
       const e = { kind: 'flow', dir: 'in', leg: 'req', proto: 'UDP', dport: 51820, remote_ip: rndIp(), local_ip: '217.230.40.237',
-        local_name: 'QuantumGateway (WAN)', r_country: 'IT', r_city: 'Mailand', r_lat: 45.46, r_lon: 9.19, r_org: 'Vodafone Italia', bytes: 90000 };
+        local_name: 'QuantumGateway (WAN)', r_country: 'IT', r_city: 'Milan', r_lat: 45.46, r_lon: 9.19, r_org: 'Vodafone Italia', bytes: 90000 };
       handle(e); remember(e);
       demo.totals.in.hits++; hours.in[23]++;
     }
@@ -780,7 +781,7 @@
     renderBars($('topServices'), top(demo.services), r => `${portName(r.dport)} ${r.proto}`, 'v');
     renderBars($('topBiggest'), top(demo.biggest), r => `${r.local_name} → ${r.r_org}`, 'v', fmtBytes);
     renderBars($('topLongest'), top(demo.longest), r => `${r.local_name} → ${r.r_org}`, 'v', fmtDur);
-    $('uniq').textContent = `${nf.format(demo.orgs.size * 37)} Ziele · ${demo.orgs.size} Firmen · ${demo.cOut.size} Länder · ${LOCALS.length} Geräte`;
+    $('uniq').textContent = `${nf.format(demo.orgs.size * 37)} destinations · ${demo.orgs.size} companies · ${demo.cOut.size} countries · ${LOCALS.length} devices`;
     renderBars($('topIn'), [{ dport: 51820, proto: 'UDP', v: demo.totals.in.hits }], r => `${portName(r.dport)} ${r.proto}`, 'v', null, () => ['dport:51820', 'in']);
     renderBars($('topInternal'), INTERNAL.map(([a, b, p], i) => ({ a, b, p, v: 4000 - i * 700 })), r => `${r.a} → ${r.b} · ${portName(r.p)}`, 'v');
     renderSpark();
@@ -795,7 +796,7 @@
     if (demoTimer) return;
     clearTimeout(reconnectTimer);
     try { ws && ws.close(); } catch {}
-    hint.hidden = true; setStatus('demo', 'Demo mit Beispieldaten');
+    hint.hidden = true; setStatus('demo', 'Demo with sample data');
     for (const d of Object.keys(hours)) {
       hours[d] = Array.from({ length: 24 }, () => Math.floor((d === 'out' ? 900 : d === 'blocked' ? 500 : d === 'internal' ? 600 : 1) * (0.5 + Math.random())));
       hoursBytes[d] = hours[d].map(v => d === 'blocked' ? 0 : v * (2e5 + Math.random() * 3e6));
@@ -859,7 +860,7 @@
   }
   // kleine Schaltfläche „✎“ neben einer IP
   function nameBtn(ip, suggestion) {
-    const b = el('button', 'pen', '✎'); b.type = 'button'; b.title = `Namen für ${ip} vergeben`;
+    const b = el('button', 'pen', '✎'); b.type = 'button'; b.title = `Name ${ip}`;
     b.addEventListener('click', ev => { ev.stopPropagation(); editName(ip, suggestion); });
     return b;
   }
@@ -877,16 +878,16 @@
   // ---------- Dossier: Land, Gerät, Firma oder Gegenstelle ----------
   const dossier = $('dossier');
   let dsState = null, dsSeq = 0;
-  const DS_KIND = { country: 'Land', device: 'Gerät', org: 'Firma', ip: 'Gegenstelle' };
+  const DS_KIND = { country: 'Country', device: 'Device', org: 'Company', ip: 'Remote host' };
   const BUCKET = { '1h': [300000, '5m'], '24h': [3600000, '1h'], '7d': [21600000, '6h'], '30d': [86400000, '1d'] };
   const dsFilter = s => s.type === 'country' ? `r_country:${lq(s.value)}` : s.type === 'device' ? `local_ip:${lq(s.value)}`
     : s.type === 'org' ? `r_org:${lq(s.value)}` : `remote_ip:${lq(s.value)}`;
   const LIST = {
-    country: { title: 'Länder', by: 'r_country', label: r => `${flag(r.r_country)} ${country(r.r_country) || 'unbekannt'}`, open: r => r.r_country && ['country', r.r_country] },
-    org: { title: 'Firmen', by: 'r_org', label: r => r.r_org || 'unbekannt', open: r => r.r_org && ['org', r.r_org] },
-    device: { title: 'Geräte', by: 'local_ip, local_name', label: r => nameOf(r.local_ip, r.local_name), open: r => ['device', r.local_ip] },
-    remote: { title: 'Gegenstellen', by: 'remote_ip, remote_name, r_org', label: r => `${nameOf(r.remote_ip, r.remote_name)}${r.r_org ? ' · ' + r.r_org : ''}`, open: r => ['ip', r.remote_ip] },
-    port: { title: 'Dienste', by: 'dport, proto', label: r => `${portName(+r.dport)} ${r.proto || ''}`, open: null }
+    country: { title: 'Countries', by: 'r_country', label: r => `${flag(r.r_country)} ${country(r.r_country) || 'unknown'}`, open: r => r.r_country && ['country', r.r_country] },
+    org: { title: 'Companies', by: 'r_org', label: r => r.r_org || 'unknown', open: r => r.r_org && ['org', r.r_org] },
+    device: { title: 'Devices', by: 'local_ip, local_name', label: r => nameOf(r.local_ip, r.local_name), open: r => ['device', r.local_ip] },
+    remote: { title: 'Remote hosts', by: 'remote_ip, remote_name, r_org', label: r => `${nameOf(r.remote_ip, r.remote_name)}${r.r_org ? ' · ' + r.r_org : ''}`, open: r => ['ip', r.remote_ip] },
+    port: { title: 'Services', by: 'dport, proto', label: r => `${portName(+r.dport)} ${r.proto || ''}`, open: null }
   };
   const DS_LISTS = { country: ['org', 'device', 'port'], device: ['country', 'org', 'remote'], org: ['country', 'device', 'remote'], ip: ['device', 'port'] };
 
@@ -897,7 +898,7 @@
   }
   function openDossier(type, value) {
     if (!value) return;
-    if (isDemo) { toast('Dossiers brauchen echte Daten – im Demo-Modus nicht verfügbar.'); return; }
+    if (isDemo) { toast('Dossiers need real data and are not available in demo mode.'); return; }
     dsState = { type, value };
     if (dossier.hidden) showOverlay(dossier);
     if (type === 'country') focusCountry(value);
@@ -930,23 +931,23 @@
       if (seq !== dsSeq) return;
       const k = kpi[0] || {};
       const kpis = [
-        ['Verbindungen', fmtNum(k.conns)], ['Datenmenge', fmtBytes(k.bytes)],
-        [s.type === 'device' ? 'Gegenstellen' : 'IP-Adressen', fmtNum(s.type === 'ip' ? k.lips : k.rips)],
-        s.type === 'device' ? ['Länder', fmtNum(k.cc)] : ['Geräte', fmtNum(k.lips)],
-        ['Erster Kontakt', k.first ? fmtWhen(k.first) : '–'], ['Letzter Kontakt', k.last ? fmtWhen(k.last) : '–'],
-        ['Abgewehrt', fmtNum((blk[0] || {}).n)]
+        ['Connections', fmtNum(k.conns)], ['Volume', fmtBytes(k.bytes)],
+        [s.type === 'device' ? 'Remote hosts' : 'IP addresses', fmtNum(s.type === 'ip' ? k.lips : k.rips)],
+        s.type === 'device' ? ['Countries', fmtNum(k.cc)] : ['Devices', fmtNum(k.lips)],
+        ['First seen', k.first ? fmtWhen(k.first) : '–'], ['Last seen', k.last ? fmtWhen(k.last) : '–'],
+        ['Blocked', fmtNum((blk[0] || {}).n)]
       ];
       $('dsKpis').replaceChildren(...kpis.map(([l, v]) => { const d = el('div', 'kpi'); d.append(el('b', null, v), el('span', null, l)); return d; }));
       renderTimeline($('dsTimeline'), tl, step, range);
       $('dsLists').replaceChildren(...lists.map((key, i) => {
         const sec = el('section'); const ul = el('ul', 'bars'); ul.dataset.c = 'out';
         sec.append(el('h3', null, LIST[key].title), ul);
-        renderBars(ul, lres[i], LIST[key].label, 'b', fmtBytes, null, 'Nichts');
+        renderBars(ul, lres[i], LIST[key].label, 'b', fmtBytes, null, 'None');
         [...ul.children].forEach((li, j) => { const o = LIST[key].open && lres[i][j] && LIST[key].open(lres[i][j]); if (o && o[1]) { li.dataset.dtype = o[0]; li.dataset.dval = o[1]; li.tabIndex = 0; } });
         return sec;
       }));
       renderPairs(pairs);
-      $('dsInfo').textContent = pairs.length >= 80 ? 'Die 80 größten Verbindungspaare · alle Einzelverbindungen über „Im Verlauf“' : '';
+      $('dsInfo').textContent = pairs.length >= 80 ? 'The 80 largest connection pairs · see all individual connections via “In history”' : '';
     } catch (err) {
       if (seq !== dsSeq) return;
       $('dsInfo').textContent = String(err.message || err);
@@ -955,7 +956,7 @@
     }
   }
   const fmtWhen = t => { const d = new Date(t); const today = new Date().toDateString() === d.toDateString();
-    return d.toLocaleString('de-DE', today ? { hour: '2-digit', minute: '2-digit' } : { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
+    return d.toLocaleString(LOCALE, today ? { hour: '2-digit', minute: '2-digit' } : { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
 
   function renderTimeline(box, rows, step, range) {
     const span = { '1h': 3600000, '24h': 86400000, '7d': 604800000, '30d': 2592000000 }[range];
@@ -966,14 +967,14 @@
     box.replaceChildren(...bytes.map((b, i) => {
       const col = el('i'); col.style.height = Math.max(b ? 4 : 0, b / max * 100) + '%';
       const t = new Date(end - (n - 1 - i) * step);
-      col.title = `${t.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}: ${nf.format(hits[i])} Verbindungen · ${fmtBytes(b)}`;
+      col.title = `${t.toLocaleString(LOCALE, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}: ${nf.format(hits[i])} connections · ${fmtBytes(b)}`;
       return col;
     }));
   }
 
   function renderPairs(rows) {
     const tb = document.querySelector('#dsPairs tbody');
-    if (!rows.length) { tb.replaceChildren(); const tr = el('tr'); const td = el('td', 'empty', 'Keine Verbindungen im Zeitraum'); td.colSpan = 8; tr.append(td); tb.append(tr); return; }
+    if (!rows.length) { tb.replaceChildren(); const tr = el('tr'); const td = el('td', 'empty', 'No connections in this time range'); td.colSpan = 8; tr.append(td); tb.append(tr); return; }
     tb.replaceChildren(...rows.map(r => {
       const tr = el('tr');
       const src = el('td'); src.append(nameOf(r.local_ip, r.local_name)); if (nameOf(r.local_ip, r.local_name) !== r.local_ip) src.append(' ', el('small', null, r.local_ip)); src.append(nameBtn(r.local_ip));
@@ -983,7 +984,7 @@
         el('td', null, r.r_country ? `${flag(r.r_country)} ${country(r.r_country)}` : ''),
         el('td', 'mono', `${portName(+r.dport)} ${r.proto || ''}`),
         el('td', 'num', nf.format(+r.n || 0)), el('td', 'num', fmtBytes(r.b)), el('td', 'mono', fmtWhen(r.last)));
-      tr.title = `Gesamtdauer ${fmtDur(r.d) || '–'} · Klick: Einzelverbindungen im Verlauf`;
+      tr.title = `Total duration ${fmtDur(r.d) || '–'} · Click: individual connections in history`;
       tr.addEventListener('click', () => openHistory(`local_ip:${lq(r.local_ip)} remote_ip:${lq(r.remote_ip)} dport:${+r.dport || 0}`, '', $('dsRange').value));
       return tr;
     }));
@@ -1009,7 +1010,7 @@
   async function loadCountries() {
     if (isDemo) { ctyRows = [...demo.cOut.values()].map(r => ({ r_country: r.r_country, n: r.v, b: 0, d: 0, blk: demo.cBlk.get(r.r_country)?.v || 0 })); renderCountries(); return; }
     const T = `_time:${$('ctyRange').value}`;
-    $('ctyInfo').textContent = 'Lade …';
+    $('ctyInfo').textContent = 'Loading …';
     try {
       const [rows, blk] = await Promise.all([
         vl(`${T} (dir:out or dir:"in") r_country:* | stats by (r_country) count() if (leg:req) as n, sum(bytes) as b, count_uniq(local_ip) as d, count_uniq(remote_ip) as ips, max(_time) as last`),
@@ -1018,14 +1019,14 @@
       const m = new Map(rows.map(r => [r.r_country, r]));
       blk.forEach(r => { const x = m.get(r.r_country) || { r_country: r.r_country, n: 0, b: 0, d: 0, ips: 0 }; x.blk = r.blk; m.set(r.r_country, x); });
       ctyRows = [...m.values()];
-      $('ctyInfo').textContent = `${ctyRows.length} Länder`;
+      $('ctyInfo').textContent = `${ctyRows.length} countries`;
       renderCountries();
     } catch (err) { $('ctyInfo').textContent = String(err.message || err); }
   }
   function renderCountries() {
     const key = ctySort;
     const val = r => key === 'name' ? country(r.r_country) : +r[key] || 0;
-    const rows = ctyRows.slice().sort((a, b) => key === 'name' ? String(val(a)).localeCompare(val(b), 'de') : val(b) - val(a));
+    const rows = ctyRows.slice().sort((a, b) => key === 'name' ? String(val(a)).localeCompare(val(b), 'en') : val(b) - val(a));
     document.querySelectorAll('#ctyTable th[data-sort]').forEach(th => th.classList.toggle('sorted', th.dataset.sort === key));
     const max = Math.max(1, ...rows.map(r => +r.b || 0));
     document.querySelector('#ctyTable tbody').replaceChildren(...rows.map(r => {
@@ -1046,14 +1047,14 @@
   devBox.addEventListener('click', ev => { if (ev.target === devBox) hideOverlay(devBox); });
   $('devFilter').addEventListener('input', () => renderDevices());
   $('devRange').addEventListener('change', loadDevices);
-  $('devAdd').addEventListener('click', () => { const ip = prompt('IP-Adresse (lokal oder extern):'); if (ip) editName(ip.trim()); });
+  $('devAdd').addEventListener('click', () => { const ip = prompt('IP address (local or external):'); if (ip) editName(ip.trim()); });
   let devRows = [];
   async function loadDevices() {
     await loadNames();
     let seen = isDemo ? [...demo.devices.values()].map(r => ({ local_ip: r.local_ip, n: 1, b: r.v })) : [];
     if (!isDemo) {
       try {
-        $('devInfo').textContent = 'Lade …';
+        $('devInfo').textContent = 'Loading …';
         seen = await vl(`_time:${$('devRange').value} -dir:blocked | stats by (local_ip) count() if (leg:req) as n, sum(bytes) as b, count_uniq(r_country) as cc, count_uniq(remote_ip) as rips, max(_time) as last | sort by (b desc) | limit 500`);
       } catch (err) { $('devInfo').textContent = String(err.message || err); }
     }
@@ -1067,13 +1068,13 @@
     const f = $('devFilter').value.trim().toLowerCase();
     const rows = devRows.filter(r => !f || r.local_ip.toLowerCase().includes(f) || (names.get(r.local_ip) || '').toLowerCase().includes(f));
     const unnamed = devRows.filter(r => !names.has(r.local_ip) && +r.n > 0).length;
-    $('devInfo').textContent = `${devRows.length} Adressen · ${names.size} mit Namen · ${unnamed} aktive ohne Namen`;
+    $('devInfo').textContent = `${devRows.length} addresses · ${names.size} named · ${unnamed} active without a name`;
     document.querySelector('#devTable tbody').replaceChildren(...rows.map(r => {
       const tr = el('tr'); tr.dataset.dtype = r.external ? 'ip' : 'device'; tr.dataset.dval = r.local_ip;
       const nm = el('td'); const n = names.get(r.local_ip);
-      if (n) nm.append(el('b', null, n)); else nm.append(el('span', 'unnamed', 'ohne Namen'));
+      if (n) nm.append(el('b', null, n)); else nm.append(el('span', 'unnamed', 'unnamed'));
       nm.append(nameBtn(r.local_ip));
-      tr.append(nm, el('td', 'mono', r.local_ip + (r.external ? ' (extern)' : '')), el('td', 'num', nf.format(+r.n || 0)), el('td', 'num', fmtBytes(r.b)),
+      tr.append(nm, el('td', 'mono', r.local_ip + (r.external ? ' (external)' : '')), el('td', 'num', nf.format(+r.n || 0)), el('td', 'num', fmtBytes(r.b)),
         el('td', 'num', nf.format(+r.rips || 0)), el('td', 'num', nf.format(+r.cc || 0)), el('td', 'mono', r.last ? fmtWhen(r.last) : '–'));
       return tr;
     }));
@@ -1088,7 +1089,7 @@
   let detailGeo = null;
   const loadDetailGeo = () => detailGeo || (detailGeo = fetch(CONFIG.textures + 'countries-50m.geojson')
     .then(r => r.json()).then(g => g.features)
-    .catch(err => { console.warn('Detailgrenzen nicht geladen:', err); return null; }));
+    .catch(err => { console.warn('Detailed borders not loaded:', err); return null; }));
   async function initCountries() {
     if (lite) return;
     try {
@@ -1106,7 +1107,7 @@
         .polygonLabel(polyLabel)
         .onPolygonHover(d => { polyHover = d; globeEl.style.cursor = d ? 'pointer' : ''; refreshPolys(); })
         .onPolygonClick(d => { if (d.properties.iso) openDossier('country', d.properties.iso); });
-    } catch (err) { console.warn('Länderflächen nicht geladen:', err); }
+    } catch (err) { console.warn('Country shapes not loaded:', err); }
   }
   let sideMat = null;
   const noSideMaterial = () => sideMat || (sideMat = new (world.globeMaterial().constructor)({ visible: false }));
@@ -1114,7 +1115,7 @@
     const iso = d.properties.iso, s = countryStats.get(iso);
     const box = el('div');
     box.append(el('b', null, `${flag(iso)} ${country(iso, d.properties.name)}`), el('br'),
-      s ? `${nf.format(s.n)} Verbindungen · ${fmtBytes(s.b)} (24 h)` : 'keine Verbindungen (24 h)');
+      s ? `${nf.format(s.n)} connections · ${fmtBytes(s.b)} (24 h)` : 'no connections (24 h)');
     return box.outerHTML;
   }
   // Globus (1:110m) und flache Karte (1:50m) haben eigene Objekte – daher über den ISO-Code vergleichen
@@ -1545,10 +1546,10 @@
     const who = e.local_name || e.local_ip;
     if (e.r_country && !known.countries.has(e.r_country)) {
       known.countries.add(e.r_country); e.isNew = true;
-      if (settings.alerts) toast(`Erstkontakt mit ${flag(e.r_country)} ${country(e.r_country)} – ${who} → ${e.r_org || e.remote_ip}`, () => openDossier('country', e.r_country), 'new');
+      if (settings.alerts) toast(`First contact with ${flag(e.r_country)} ${country(e.r_country)}: ${who} → ${e.r_org || e.remote_ip}`, () => openDossier('country', e.r_country), 'new');
     } else if (e.r_org && !known.orgs.has(e.r_org)) {
       known.orgs.add(e.r_org); e.isNew = true;
-      if (settings.alerts) toast(`Neue Gegenstelle: ${e.r_org} (${flag(e.r_country)} ${country(e.r_country)}) – von ${who}`, () => openDossier('org', e.r_org), 'new');
+      if (settings.alerts) toast(`New remote: ${e.r_org} (${flag(e.r_country)} ${country(e.r_country)}) from ${who}`, () => openDossier('org', e.r_org), 'new');
     }
   }
 
@@ -1556,7 +1557,7 @@
   function toast(text, onClick, kind) {
     const box = $('toasts');
     const t = el('div', 'toast' + (kind ? ' ' + kind : ''));
-    t.append(el('span', 'kick', kind === 'new' ? 'NEU' : 'INFO'), el('span', null, text));
+    t.append(el('span', 'kick', kind === 'new' ? 'NEW' : 'INFO'), el('span', null, text));
     if (onClick) { t.classList.add('click'); t.addEventListener('click', () => { onClick(); t.remove(); }); }
     box.prepend(t);
     while (box.children.length > 4) box.lastChild.remove();
@@ -1566,7 +1567,7 @@
 
   // ---------- Einstellungen ----------
   const setBox = $('settings');
-  const fmtDec = (v, d = 1) => (+v).toFixed(d).replace('.', ',');
+  const fmtDec = (v, d = 1) => (+v).toFixed(d);
   // Bedienelement -> Einstellung; „ui“ = Oberfläche neu anwenden, „globe“ = Globus neu anwenden
   const OPTS = [
     { id: 'optSmooth', key: 'smooth', type: 'check', after: () => { if (!settings.smooth) flushPending(); } },
@@ -1657,7 +1658,7 @@
       if (r.status === 401) return toLogin();
       if (!r.ok) return;
       const c = await r.json();
-      if (c.home && isFinite(+c.home.lat) && isFinite(+c.home.lng)) CONFIG.home = { lat: +c.home.lat, lng: +c.home.lng, label: String(c.home.label || 'Zuhause') };
+      if (c.home && isFinite(+c.home.lat) && isFinite(+c.home.lng)) CONFIG.home = { lat: +c.home.lat, lng: +c.home.lng, label: String(c.home.label || 'Home') };
       if (c.gateway) CONFIG.gateway = String(c.gateway);
     } catch {}
   }

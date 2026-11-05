@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
 <meta name="color-scheme" content="dark">
 <meta name="robots" content="noindex">
-<title>Anmelden · Lagezentrum</title>
+<title>Log in · Lagezentrum</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="login.css">
 </head>
@@ -14,15 +14,15 @@
 <main>
   <form class="card" id="loginForm" autocomplete="on">
     <img src="favicon.svg" alt="" width="48" height="48">
-    <div class="kicker">Nur für Befugte</div>
+    <div class="kicker">Authorized access only</div>
     <h1>Lagezentrum</h1>
     <!-- Für Passwortmanager: fester Benutzername, damit sie das Passwort zuordnen können -->
     <input type="text" name="username" value="lagezentrum" autocomplete="username" class="sr" tabindex="-1" aria-hidden="true" readonly>
-    <label for="pw">Passwort</label>
+    <label for="pw">Password</label>
     <input id="pw" name="password" type="password" autocomplete="current-password" required autofocus maxlength="1024">
     <div class="err" id="err" role="alert"></div>
-    <button type="submit" id="go">Anmelden</button>
-    <small>Dieser Browser bleibt angemeldet – bei regelmäßiger Nutzung praktisch dauerhaft, sonst 400 Tage.</small>
+    <button type="submit" id="go">Log in</button>
+    <small>This browser stays logged in: indefinitely with regular use, otherwise for 400 days.</small>
   </form>
 </main>
 <script src="login.js"></script>

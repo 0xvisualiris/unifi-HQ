@@ -75,16 +75,16 @@ func hashPassword(pw string, iter int) (string, error) {
 func parseHash(s string) (*pwHash, error) {
 	p := strings.Split(strings.TrimSpace(s), ":")
 	if len(p) != 4 || p[0] != hashScheme {
-		return nil, errors.New("unbekanntes Format (erwartet " + hashScheme + ":…)")
+		return nil, errors.New("unknown format (expected " + hashScheme + ":…)")
 	}
 	iter, err := strconv.Atoi(p[1])
 	if err != nil || iter < 10_000 || iter > 50_000_000 {
-		return nil, errors.New("ungültige Iterationszahl")
+		return nil, errors.New("invalid iteration count")
 	}
 	salt, err1 := b64.DecodeString(p[2])
 	key, err2 := b64.DecodeString(p[3])
 	if err1 != nil || err2 != nil || len(salt) < 8 || len(key) < 16 {
-		return nil, errors.New("Salz oder Schlüssel ungültig")
+		return nil, errors.New("invalid salt or key")
 	}
 	return &pwHash{iter, salt, key}, nil
 }
@@ -341,18 +341,18 @@ func (a *authCfg) deny(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, loc, http.StatusFound)
 		return
 	}
-	fail(w, http.StatusUnauthorized, "Anmeldung erforderlich")
+	fail(w, http.StatusUnauthorized, "Login required")
 }
 
 // require schützt einen Handler zusätzlich in der API selbst (falls Caddy falsch konfiguriert ist)
 func (a *authCfg) require(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if a.enabled && a.bad != nil {
-			fail(w, http.StatusServiceUnavailable, "Login falsch eingerichtet: "+a.bad.Error())
+			fail(w, http.StatusServiceUnavailable, "Login misconfigured: "+a.bad.Error())
 			return
 		}
 		if !a.allowed(r) {
-			fail(w, http.StatusUnauthorized, "Anmeldung erforderlich")
+			fail(w, http.StatusUnauthorized, "Login required")
 			return
 		}
 		h(w, r)
@@ -380,40 +380,40 @@ func (a *authCfg) routes(mux *http.ServeMux) {
 
 	mux.HandleFunc("POST /auth/login", func(w http.ResponseWriter, r *http.Request) {
 		if !sameOrigin(r) {
-			fail(w, 403, "fremde Herkunft")
+			fail(w, 403, "cross-origin request rejected")
 			return
 		}
 		if !a.enabled {
-			fail(w, 400, "Kein Passwort gesetzt – auf dem Server: ./lagezentrum.sh password")
+			fail(w, 400, "No password set. On the server run: ./lagezentrum.sh password")
 			return
 		}
 		if a.bad != nil {
 			log.Printf("Login unmöglich, AUTH_PASSWORD_HASH ungültig: %v", a.bad)
-			fail(w, 503, "Login falsch eingerichtet – auf dem Server: ./lagezentrum.sh password")
+			fail(w, 503, "Login misconfigured. On the server run: ./lagezentrum.sh password")
 			return
 		}
 		if !strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
-			fail(w, 415, "JSON erwartet")
+			fail(w, 415, "JSON expected")
 			return
 		}
 		var in struct {
 			Password string `json:"password"`
 		}
 		if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&in); err != nil || in.Password == "" || len(in.Password) > 1024 {
-			fail(w, 400, "Passwort fehlt")
+			fail(w, 400, "Password missing")
 			return
 		}
 		key := clientKey(r)
 		if d := a.lim.wait(key, a.now()); d > 0 {
 			secs := int(d.Round(time.Second) / time.Second)
 			w.Header().Set("Retry-After", strconv.Itoa(secs))
-			fail(w, 429, fmt.Sprintf("Zu viele Fehlversuche – bitte in %s erneut versuchen", humanWait(d)))
+			fail(w, 429, fmt.Sprintf("Too many failed attempts. Try again in %s", humanWait(d)))
 			return
 		}
 		select {
 		case a.sem <- struct{}{}:
 		case <-time.After(5 * time.Second):
-			fail(w, 503, "Server ausgelastet, bitte gleich noch einmal")
+			fail(w, 503, "Server busy, please try again in a moment")
 			return
 		case <-r.Context().Done():
 			return
@@ -424,7 +424,7 @@ func (a *authCfg) routes(mux *http.ServeMux) {
 			a.lim.fail(key, a.now())
 			log.Printf("Fehlgeschlagener Login von %s", key)
 			time.Sleep(a.delay)
-			fail(w, 401, "Falsches Passwort")
+			fail(w, 401, "Wrong password")
 			return
 		}
 		a.lim.reset(key)
@@ -435,7 +435,7 @@ func (a *authCfg) routes(mux *http.ServeMux) {
 
 	mux.HandleFunc("POST /auth/logout", func(w http.ResponseWriter, r *http.Request) {
 		if !sameOrigin(r) {
-			fail(w, 403, "fremde Herkunft")
+			fail(w, 403, "cross-origin request rejected")
 			return
 		}
 		a.setCookie(w, r, "", 0)

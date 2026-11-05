@@ -18,7 +18,7 @@
     ev.preventDefault();
     if (!pw.value) return;
     err.textContent = '';
-    btn.disabled = true; btn.textContent = 'Prüfe …';
+    btn.disabled = true; btn.textContent = 'Checking …';
     try {
       const r = await fetch('auth/login', {
         method: 'POST', cache: 'no-store',
@@ -26,12 +26,12 @@
         body: JSON.stringify({ password: pw.value })
       });
       const j = await r.json().catch(() => ({}));
-      if (r.ok) { btn.textContent = 'Angemeldet'; go(); return; }
-      err.textContent = j.error || `Anmeldung fehlgeschlagen (HTTP ${r.status})`;
+      if (r.ok) { btn.textContent = 'Logged in'; go(); return; }
+      err.textContent = j.error || `Login failed (HTTP ${r.status})`;
       pw.select();
     } catch {
-      err.textContent = 'Server nicht erreichbar';
+      err.textContent = 'Server unreachable';
     }
-    btn.disabled = false; btn.textContent = 'Anmelden';
+    btn.disabled = false; btn.textContent = 'Log in';
   });
 })();

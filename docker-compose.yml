@@ -106,7 +106,7 @@ services:
       ALLOWED_CLIENTS: ${ALLOWED_CLIENTS:-private_ranges}
       HOME_LAT: ${HOME_LAT:-50.11}
       HOME_LON: ${HOME_LON:-8.68}
-      HOME_LABEL: ${HOME_LABEL:-Zuhause}
+      HOME_LABEL: ${HOME_LABEL:-Home}
       GATEWAY_NAME: ${GATEWAY_NAME:-Gateway}
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
