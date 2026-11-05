@@ -1,0 +1,59 @@
+# Lagezentrum – all-in-one container (tutorial: docs/DOCKER.md)
+#
+#   docker compose -f docker/compose.yml up -d
+#   docker exec unifi-hq lz test
+#
+# Host networking keeps the sender IPs of NetFlow/syslog and the browser intact,
+# and keeps the internal services (VictoriaLogs, live stream, API) on 127.0.0.1.
+
+name: unifi-hq
+
+services:
+  unifi-hq:
+    image: ghcr.io/0xvisualiris/unifi-hq:latest
+    # build: ..                    # or build it yourself from this repo
+    container_name: unifi-hq
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Berlin
+      # Public IPv4 of your gateway (comma-separated if several)
+      WAN_IP: ""
+      # IP of the gateway that sends NetFlow/syslog. Empty = any private address
+      ALLOWED_SENDERS: ""
+      # Your IPv6 prefix, otherwise your own IPv6 devices show up as foreign
+      LOCAL_EXTRA_NETS: ""
+      # Ports reachable from outside (port forwards, VPN server)
+      LOCAL_SERVER_PORTS: "51820"
+      IGNORE_IPS: ""
+      # Location on the globe (no quotes in the texts)
+      HOME_LAT: "50.11"
+      HOME_LON: "8.68"
+      HOME_LABEL: Frankfurt
+      GATEWAY_NAME: Gateway
+      HTTP_PORT: "8080"
+      ALLOWED_CLIENTS: private_ranges
+      # Dashboard login, min. 10 characters. Better: AUTH_PASSWORD_HASH or AUTH_PASSWORD_FILE
+      AUTH_PASSWORD: ""
+      RETENTION: 90d
+      MAX_DISK: 20GiB
+      # Owner of the files in /data (e.g. 568 for TrueNAS "apps")
+      PUID: "65534"
+      PGID: "65534"
+    volumes:
+      - unifi-hq-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID, KILL]
+    mem_limit: 1g
+    logging:
+      driver: local
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+volumes:
+  unifi-hq-data:

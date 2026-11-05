@@ -12,6 +12,7 @@ updates:
   # (Vector, GoFlow2 im collector/Dockerfile), erkennt Dependabot womöglich nicht.
   - package-ecosystem: docker
     directories:
+      - /
       - /api
       - /collector
     schedule:

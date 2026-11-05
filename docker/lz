@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Lagezentrum all-in-one – helper inside the container (docker exec unifi-hq lz <command>)
+#   lz test       self-test: send a test flow + test syslog line and check they arrive
+#   lz status     events of the last hour, last event per source, disk usage
+#   lz geoip      download the GeoIP databases now and reload Vector
+#   lz reload     reload Vector (e.g. after editing /data/config/hosts.csv by hand)
+set -euo pipefail
+DATA=${DATA_DIR:-/data}
+
+c_ok() { printf '\033[32m✔\033[0m %s\n' "$*"; }
+c_warn() { printf '\033[33m!\033[0m %s\n' "$*"; }
+c_err() { printf '\033[31m✘\033[0m %s\n' "$*" >&2; }
+vlq() { curl -fsS --max-time 10 http://127.0.0.1:9428/select/logsql/query --data-urlencode "query=$1"; }
+count() { vlq "$1" 2>/dev/null | grep -o '"n":"[0-9]*"' | grep -o '[0-9]*' || echo 0; }
+reload_vector() { pkill -HUP -x vector; }
+as_user() { if [ "$(id -u)" = 0 ]; then su-exec "${PUID}:${PGID}" "$@"; else "$@"; fi; }
+
+cmd_test() {
+  local marker; marker=$(date +%s)
+  # IPFIX packet with the current export time: template + 1 flow 10.37.10.250:40000 -> 9.9.9.9:443 TCP (4242 bytes)
+  local hex
+  hex="000a0055$(printf '%08x' "$(date +%s)")0000000000001092"
+  hex+="000200240100000700080004000c000400070002000b0002000400010001000800020008"
+  hex+="010000210a250afa090909099c4001bb0600000000000010920000000000000007"
+  local tmp; tmp=$(mktemp)
+  printf "$(echo "$hex" | sed 's/../\\x&/g')" > "$tmp"
+  cat "$tmp" > /dev/udp/127.0.0.1/2055      # one write() = one datagram
+  rm -f "$tmp"
+  # Syslog in UniFi format: blocked SSH attempt from scanme.nmap.org
+  printf '<4>%s QuantumGateway kernel: [WAN_LOCAL-B-99999] DESCR="Lagezentrum self-test %s" IN=eth4 OUT= SRC=45.33.32.156 DST=%s PROTO=TCP SPT=40000 DPT=22' \
+    "$(LC_ALL=C date '+%b %e %H:%M:%S')" "$marker" "$(echo "${WAN_IP:-}" | cut -d, -f1 | grep . || echo 203.0.113.1)" > /dev/udp/127.0.0.1/5514
+  echo "Test packets sent, waiting for VictoriaLogs …"
+  local flow=0 blk=0 rc=0
+  for _ in $(seq 1 20); do
+    sleep 1
+    flow=$(count '_time:2m remote_ip:"9.9.9.9" local_ip:"10.37.10.250" | stats count() n')
+    blk=$(count "_time:5m dir:blocked rule:\"self-test $marker\" | stats count() n")
+    [ "${flow:-0}" -gt 0 ] && [ "${blk:-0}" -gt 0 ] && break
+  done
+  if [ "${flow:-0}" -gt 0 ]; then c_ok "NetFlow path: GoFlow2 -> Vector -> VictoriaLogs works"; else c_err "test flow did not arrive (docker logs unifi-hq)"; rc=1; fi
+  if [ "${blk:-0}" -gt 0 ]; then c_ok "Syslog path: Vector -> VictoriaLogs works"; else c_err "test syslog line did not arrive (docker logs unifi-hq)"; rc=1; fi
+  local geo; geo=$(vlq "_time:5m dir:blocked rule:\"self-test $marker\" | fields r_country" 2>/dev/null | head -1 || true)
+  if [[ "$geo" == *'"US"'* ]]; then c_ok "GeoIP works (45.33.32.156 -> US)"; else c_warn "GeoIP lookup missing ($geo)"; fi
+  local port=${HTTP_PORT:-8080} code lcode
+  code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/" || true)
+  lcode=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$port/login.html" || true)
+  case "$code/$lcode" in
+    401/200) c_ok "Dashboard answers, login active (HTTP $code without session)" ;;
+    200/200) c_ok "Dashboard answers (HTTP $code)"
+             c_warn "No login password set – anyone on the LAN can open the dashboard (AUTH_PASSWORD)" ;;
+    *) c_err "Dashboard/login not as expected (/: HTTP $code, /login.html: HTTP $lcode)"; rc=1 ;;
+  esac
+  echo "Note: the test flow shows up as \"out 10.37.10.250 -> 9.9.9.9 (Quad9)\" in the history."
+  return $rc
+}
+
+cmd_status() {
+  echo "History on disk: $(du -sh "$DATA/vlogs" 2>/dev/null | cut -f1)"
+  echo "GeoIP: $(for f in /geoip/*.mmdb; do printf '%s (%s) ' "$(basename "$f")" "$(date -r "$f" +%Y-%m-%d)"; done)"
+  echo
+  echo "Events in the last hour:"
+  vlq '_time:1h | stats by (dir) count() if (leg:req) as connections, sum(bytes) as bytes' || c_warn "VictoriaLogs not reachable"
+  echo
+  echo "Last event per source:"
+  vlq '_time:24h | stats by (kind) max(_time) as last' || true
+}
+
+cmd_geoip() {
+  as_user env GEOIP_MAX_AGE_DAYS=0 sh /usr/local/share/unifi-hq/geoip-update.sh
+  reload_vector && c_ok "Vector reloaded (new GeoIP data active)"
+}
+
+case "${1:-}" in
+  test) cmd_test ;;
+  status) cmd_status ;;
+  geoip) cmd_geoip ;;
+  reload) reload_vector && c_ok "Vector reloaded" ;;
+  *) sed -n '2,6p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac

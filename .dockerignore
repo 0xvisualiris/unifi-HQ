@@ -1,0 +1,10 @@
+# Only what the all-in-one Dockerfile copies; keeps secrets and the GeoIP DBs out of the build
+.git
+.github
+.env
+docs
+proxmox
+geoip
+README.md
+config/hosts.csv
+caddy/auth/*.caddy

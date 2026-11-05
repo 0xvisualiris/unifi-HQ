@@ -110,6 +110,19 @@ More options: `CTID`, `STORAGE`, `DISK`, `CORES`, `RAM`, `SWAP`, `BRIDGE`, `CT_H
 the suggestion) and runs a self-test. Without cloning:
 `curl -fsSL https://raw.githubusercontent.com/ProfessorQuantumUniverse/unifi-HQ/main/install.sh | bash`.
 
+### Option C: plain Docker (no Proxmox)
+
+Already have a Docker host (Linux server, Synology, Unraid, TrueNAS, Raspberry Pi)? Run the
+all-in-one image: one container, one volume, configured with environment variables.
+
+```bash
+docker run -d --name unifi-hq --network host --restart unless-stopped   -e AUTH_PASSWORD='choose-a-long-password' -e ALLOWED_SENDERS=192.168.1.1   -v unifi-hq-data:/data ghcr.io/0xvisualiris/unifi-hq:latest
+docker exec unifi-hq lz test
+```
+
+Step-by-step tutorial with Compose, all settings, NAS notes and troubleshooting:
+**[docs/DOCKER.md](docs/DOCKER.md)**. The UniFi setup below is the same, use the Docker host's IP.
+
 ### Setup values
 
 | Value | Meaning |
@@ -363,6 +376,8 @@ it's one line in the `blocked` transform in `collector/vector.yaml`.
 
 ```
 docker-compose.yml        containers, hardening, RAM limits, log rotation
+Dockerfile                all-in-one image for plain Docker hosts (docs/DOCKER.md)
+docker/                   entrypoint, lz helper and compose.yml for the all-in-one image
 .env.example              template for .env (copied by setup)
 install.sh                install inside the LXC: packages, Docker, project, setup, self-test
 proxmox/create-lxc.sh     on the Proxmox host: create LXC and run install.sh in it
@@ -376,7 +391,7 @@ caddy/auth/               only for old basic auth from earlier versions
 scripts/geoip-update.sh   GeoIP download (runs in the geoip container)
 api/                      login + names API (Go, standard library only)
 web/                      dashboard, login page, vendor/ (globe.gl, textures, fonts)
-docs/                     screenshots
+docs/                     screenshots, DOCKER.md (Docker tutorial)
 geoip/                    downloaded databases (not in git)
 ```
 
