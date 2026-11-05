@@ -1,115 +1,107 @@
 # Lagezentrum
 
-Live-Weltkarte für das Heimnetz: Jede Verbindung über dein UniFi Gateway fliegt als
-Bogen über einen 3D-Globus. Dazu Live-Ticker, 24-h-Statistik und eine durchsuchbare Historie.
+Live world map for your home network. Every connection through your UniFi gateway is drawn as an
+arc over a 3D globe, next to a live ticker, 24 h stats and a searchable history.
 
-- **Standardansicht:** erlaubte Verbindungen raus (cyan) und rein (grün)
-- **Zuschaltbar:** abgewehrte Anklopfer aus dem Internet (rot) und Verkehr zwischen VLANs (lila)
-- **Nur im LAN erreichbar und mit Login** (ein Passwort, der Browser bleibt angemeldet), ein einzelner LXC,
-  rund 200–250 MB RAM im Betrieb
+![Globe view](docs/globe.png)
 
----
+- **Default view:** allowed outbound (cyan) and inbound (green) connections
+- **Optional:** blocked scans from the internet (red) and inter-VLAN traffic (purple)
+- **LAN only, password login** (the browser stays signed in), one LXC, about 200–250 MB RAM
 
-## Inhalt
+The dashboard UI is in German. Main terms: *Raus* = outbound, *Rein* = inbound, *Abgewehrt* = blocked,
+*Intern* = inter-VLAN, *Verlauf* = history, *Länder* = countries, *Geräte* = devices.
 
-1. [Aufbau](#aufbau)
-2. [Proxmox: Storage](#1-proxmox-storage-für-die-spare-ssd)
-3. [Installieren](#2-installieren)
-4. [UniFi einrichten](#3-unifi-einrichten)
-5. [Testen](#4-testen)
-6. [Bedienung](#bedienung)
-7. [Betrieb](#betrieb)
-8. [Sicherheit](#sicherheit)
-9. [Ressourcen](#ressourcen)
-10. [Fehlersuche](#fehlersuche)
-11. [Dateien](#dateien)
+## Contents
 
----
+1. [Architecture](#architecture)
+2. [Proxmox storage](#1-proxmox-storage)
+3. [Install](#2-install)
+4. [UniFi setup](#3-unifi-setup)
+5. [Test](#4-test)
+6. [Usage](#usage)
+7. [What UniFi exports](#what-unifi-exports)
+8. [Operation](#operation)
+9. [Security](#security)
+10. [Resources](#resources)
+11. [Troubleshooting](#troubleshooting)
+12. [Files](#files)
 
-## Aufbau
+## Architecture
 
 ```
-UCG Max ──IPFIX  UDP 2055──▶ GoFlow2 ─┐  (Kindprozess von Vector, kein Docker-Socket)
+UCG Max ──IPFIX  UDP 2055──▶ GoFlow2 ─┐  (child process of Vector, no Docker socket)
 UCG Max ──Syslog UDP 5514──▶ Vector ◀─┘
-                               │  Richtung erkennen · Antworten zuordnen · GeoIP/ASN · Gerätenamen
-                               ├──▶ VictoriaLogs   127.0.0.1:9428   Historie (90 Tage / 20 GiB)
-                               └──▶ WebSocket      127.0.0.1:8090   Live-Stream
-Browser ──HTTP 8080──▶ Caddy ──▶ Dashboard · /ws (live) · /select (Abfragen) · /api (Namen)   nur LAN
-                         │  Sitzung gültig? (forward_auth)                       │
+                               │  direction · request/response pairing · GeoIP/ASN · device names
+                               ├──▶ VictoriaLogs   127.0.0.1:9428   history (90 days / 20 GiB)
+                               └──▶ WebSocket      127.0.0.1:8090   live stream
+Browser ──HTTP 8080──▶ Caddy ──▶ dashboard · /ws (live) · /select (queries) · /api (names)   LAN only
+                         │  session valid? (forward_auth)                        │
                          ▼                                                       │
                 API 127.0.0.1:8092 ◀─────────────────────────────────────────────┘
-                Login · config/hosts.csv ──SIGHUP──▶ Vector lädt Namen neu
+                login · config/hosts.csv ──SIGHUP──▶ Vector reloads names
 ```
 
-| Container | Aufgabe | RAM-Limit |
+| Container | Job | RAM limit |
 |---|---|---|
-| `collector` | Vector 0.58 mit eingebautem GoFlow2 2.2.7 | 384 MB |
-| `victorialogs` | Historie, stark komprimiert | 512 MB |
-| `caddy` | Webserver, Zugriffsschutz | 64 MB |
-| `api` | Login prüfen, Gerätenamen aus dem Dashboard speichern (Go, ~5 MB) | 32 MB |
-| `geoip` | Einmal-Job: lädt DB-IP Lite, wenn nötig | 128 MB |
+| `collector` | Vector 0.58 with built-in GoFlow2 2.2.7 | 384 MB |
+| `victorialogs` | history, heavily compressed | 512 MB |
+| `caddy` | web server, access control | 64 MB |
+| `api` | login, saves device names from the dashboard (Go, ~5 MB) | 32 MB |
+| `geoip` | one-shot job, downloads DB-IP Lite when needed | 128 MB |
 
-Alle Container laufen mit schreibgeschütztem Dateisystem, ohne Linux-Capabilities
-(Caddy: nur `NET_BIND_SERVICE`) und mit `no-new-privileges`. Vector und GoFlow2 laufen als `nobody`.
+All containers run with a read-only filesystem, no Linux capabilities (Caddy: only `NET_BIND_SERVICE`)
+and `no-new-privileges`. Vector and GoFlow2 run as `nobody`.
 
-**Wie die Richtung bestimmt wird:** NetFlow meldet jede Verbindung doppelt – Anfrage und
-Antwort. Die Pipeline ordnet beide derselben Verbindung zu (`leg=req` / `leg=resp`). Live und in
-den Zählern erscheint nur die Anfrage; die Antwort zählt beim Datenvolumen mit (sonst fehlen
-alle Downloads). Über die WAN-Grenze gilt die lokale Seite als Client, außer ihr Port steht in
-`LOCAL_SERVER_PORTS` (z. B. WireGuard 51820) oder ist ein klassischer Server-Port unter 1024 –
-und die Gegenseite kommt nicht selbst von einem Dienst-Port (unter 1024 oder STUN/TURN). Sonst
-würde ein Client, der zufällig 51820 als Quellport zieht, als „rein“ erscheinen.
+**How direction is detected:** NetFlow reports each connection twice, request and response. The
+pipeline pairs them (`leg=req` / `leg=resp`). The live view and counters only show the request; the
+response still counts towards traffic volume (otherwise downloads would be missing). Across the WAN
+boundary the local side is the client, unless its port is in `LOCAL_SERVER_PORTS` (e.g. WireGuard
+51820) or is a classic server port below 1024, and the remote side isn't itself using a service port
+(below 1024 or STUN/TURN). Otherwise a client that happens to pick 51820 as source port would show up
+as inbound.
 
----
+## 1. Proxmox storage
 
-## 1. Proxmox: Storage für die Logs
+One-time, so logs never land on the system SSD:
 
-Einmalig, damit Logs nie auf der System-SSD landen:
+1. Node → Disks: the disk must be listed as unused (otherwise *Wipe Disk*, which erases it).
+2. Node → Disks → LVM-Thin → *Create: Thinpool*, pick the disk, name `ssd-logs`, keep *Add Storage* checked.
 
-0a. Node → Disks: die Platte muss als ungenutzt gelistet sein (sonst *Wipe Disk* – löscht alles darauf).
-1. Node → Disks → LVM-Thin → *Create: Thinpool*, Disk wählen, Name `ssd-logs`, *Add Storage* angehakt.
+## 2. Install
 
----
+### Option A: automatic (recommended)
 
-## 2. Installieren
+On the **Proxmox host** as root. Set `VLAN` to the real ID (e.g. `VLAN=10`). That VLAN needs:
 
-### Variante A: alles automatisch (empfohlen)
+- reachable from the gateway VLAN
+- internet access
+- reachable from your client/trusted VLAN
 
-Auf dem **Proxmox-Host** als root:
-**WICHTIG:** Unbedingt VLAN=xx angeben, damit der LXC in einem VLAN mit folgenden Eigenschaften landet:
-* Das Gateway VLAN kann VLAN-xx erreichen
-* VLAN-xx hat Internetzugriff
-* Das Client/Trusted VLAN (Da wo deine Geräte sind) kann auf VLAN-xx zugreifen!
-
-VLAN=xx vor dem Ausführen gegen die echte ID ersetzen; zB VLAN=10
-
-Vom Host:
 ```bash
 apt -y install git
 git clone https://github.com/ProfessorQuantumUniverse/unifi-HQ.git /root/unifi-HQ
 VLAN=xx /root/unifi-HQ/proxmox/create-lxc.sh
 ```
 
-Das Skript lädt das aktuelle Debian-Template, legt einen unprivilegierten LXC auf `ssd-logs` an
-(2 Kerne, 1536 MB RAM als Obergrenze, 32 GB Festplatte, `nesting` + `keyctl`, Start beim Booten), kopiert
-das Projekt hinein und ruft dort `install.sh` auf. Am Ende stehen IP und alle Adressen da.
-Platten fasst es nicht an.
+The script fetches the current Debian template, creates an unprivileged LXC on `ssd-logs` (2 cores,
+1536 MB RAM max, 32 GB disk, `nesting` + `keyctl`, start on boot), copies the project in and runs
+`install.sh`. It prints the IP and all URLs at the end. It doesn't touch any disks.
 
-Später via Setupskript (empfohlen), oder:
-Anpassen per Umgebungsvariablen, z. B. feste IP im VLAN 10 und Gateway-IP vorgeben:
+Values can also be passed as environment variables, e.g. static IP and gateway:
 
 ```bash
 IP=10.37.10.50/24 GW=10.37.10.1 VLAN=10 ALLOWED_SENDERS=10.37.10.1 HOME_LABEL=Frankfurt \
   /root/unifi-HQ/proxmox/create-lxc.sh
 ```
 
-Weitere Optionen: `CTID`, `STORAGE`, `DISK`, `CORES`, `RAM`, `SWAP`, `BRIDGE`, `CT_HOSTNAME` – siehe Kopf des Skripts.
+More options: `CTID`, `STORAGE`, `DISK`, `CORES`, `RAM`, `SWAP`, `BRIDGE`, `CT_HOSTNAME` (see the script header).
 
-### Variante B: LXC selbst anlegen, dann installieren
+### Option B: create the LXC yourself
 
-1. *Create CT*: Debian 13, *Unprivileged* an, Disk auf `ssd-logs` (32 GB), 2 Kerne, 1536 MB RAM, 512 MB Swap.
-2. Container → Options → Features → `nesting` und `keyctl` an, starten.
-3. In der Konsole des Containers:
+1. *Create CT*: Debian 13, *Unprivileged* on, disk on `ssd-logs` (32 GB), 2 cores, 1536 MB RAM, 512 MB swap.
+2. Container → Options → Features → enable `nesting` and `keyctl`, start it.
+3. In the container console:
 
    ```bash
    apt update && apt -y install git
@@ -117,308 +109,282 @@ Weitere Optionen: `CTID`, `STORAGE`, `DISK`, `CORES`, `RAM`, `SWAP`, `BRIDGE`, `
    /opt/lagezentrum/install.sh
    ```
 
-`install.sh` installiert die nötigen Pakete und Docker, richtet alles ein, fragt ein paar Werte
-ab (Vorschläge mit Enter übernehmen) und macht zum Schluss einen Selbsttest. Ist das Repo
-öffentlich, geht es auch ohne Klonen:
+`install.sh` installs packages and Docker, sets everything up, asks for a few values (Enter accepts
+the suggestion) and runs a self-test. Without cloning:
 `curl -fsSL https://raw.githubusercontent.com/ProfessorQuantumUniverse/unifi-HQ/main/install.sh | bash`.
-Bei einem privaten Repo klonst du mit Token (`https://<token>@github.com/…`) – oder nimmst
-Variante A, die das Projekt vom Host in den Container kopiert.
 
-### Was das Setup abfragt bzw. anlegt
+### Setup values
 
-| Wert | Bedeutung |
+| Value | Meaning |
 |---|---|
-| `WAN_IP` | öffentliche IPv4, wird automatisch ermittelt |
-| `ALLOWED_SENDERS` | IP des Gateways, das NetFlow/Syslog schickt (Vorschlag: Default-Gateway des LXC) |
-| `GATEWAY_NAME`, `HOME_LABEL`, `HOME_LAT`, `HOME_LON` | Name und Standort auf dem Globus |
-| `LOCAL_EXTRA_NETS` | dein IPv6-Präfix, z. B. `2003:ab:cd00::/56` – sonst erscheinen eigene Geräte mit IPv6 als „Fremde“ |
-| `LOCAL_SERVER_PORTS` | von außen erreichbare Ports (Portfreigaben, VPN-Server), Standard `51820` |
-| Login-Passwort | fragt `setup` am Ende ab (mindestens 10 Zeichen); landet nur als Hash in der `.env` |
+| `WAN_IP` | public IPv4, detected automatically |
+| `ALLOWED_SENDERS` | IP of the gateway sending NetFlow/syslog (default: the LXC's default gateway) |
+| `GATEWAY_NAME`, `HOME_LABEL`, `HOME_LAT`, `HOME_LON` | name and location on the globe |
+| `LOCAL_EXTRA_NETS` | your IPv6 prefix, e.g. `2003:ab:cd00::/56`, otherwise your own IPv6 devices show up as foreign |
+| `LOCAL_SERVER_PORTS` | ports reachable from outside (port forwards, VPN server), default `51820` |
+| Login password | asked at the end of `setup` (min. 10 characters), stored only as a hash in `.env` |
 
-Alles landet in `.env` und lässt sich dort jederzeit ändern (danach `docker compose up -d`).
-Gerätenamen trägst du in `config/hosts.csv` ein, eine Zeile pro Gerät: `10.37.10.3,homelable`
-(danach `docker compose restart collector`). `setup` richtet außerdem das monatliche
-GeoIP-Update per Cron ein. Erneut aufrufen ist gefahrlos: `./lagezentrum.sh setup`.
+Everything lives in `.env` and can be changed there (then `docker compose up -d`). Device names go
+into `config/hosts.csv`, one per line: `10.37.10.3,homelable` (then `docker compose restart collector`).
+`setup` also adds a monthly GeoIP update cron job. Re-running `./lagezentrum.sh setup` is safe.
 
----
+## 3. UniFi setup
 
-## 3. UniFi einrichten
+### A. NetFlow (all allowed connections)
 
-### A. NetFlow (alle erlaubten Verbindungen)
+Settings → CyberSecure → *Traffic Logging*:
 
-Einstellungen → CyberSecure → *Traffic Logging*:
-- **NetFlow (IPFIX)** an, Collector `<LXC-IP>`, Port `2055`, Version 10 (IPFIX), 
-- **Alle Netzwerke** auswählen, sonst fehlen VLANs
-- Flow-Protokollierung: *Gesamter Datenverkehr*
-- Engine-ID: Automatisch
-- Timeout-Rate: 1 min
-- Bildwiederholrate: 20
-- **Sampling Modus: AUS**
-- Sampling-Rate: MUSS ausgegraut sein
+- **NetFlow (IPFIX)** on, collector `<LXC-IP>`, port `2055`, version 10 (IPFIX)
+- Select **all networks**, otherwise VLANs are missing
+- Flow logging: *All traffic*
+- Engine ID: automatic
+- Timeout rate: 1 min
+- Refresh rate: 20
+- **Sampling mode: off** (sampling rate must be greyed out)
 
-Etwaige Performance Warnungen ignorieren/akzeptieren; die Performance bricht damit erst bei 1000+ Geräten spürbar ein.
+Ignore the performance warning. It only matters with 1000+ devices.
 
-### B. (Optional) Syslog (für „Abgewehrt“)
+### B. Syslog for blocked traffic (optional)
 
-Gleiche Seite, *Activity Logging / SIEM-Server*:
+Same page, *Activity Logging / SIEM Server*:
 
-- Adresse `<LXC-IP>`, Port `5514`
-- Bei den Inhalten mindestens die Sicherheits-Erkennungen anhaken
+- Address `<LXC-IP>`, port `5514`
+- Include at least the security detections
 
-### C. (Optionales Optional) Regel für die Anklopfer
+### C. Rule for scanners (optional)
 
-Ohne diese Regel prallen Scanner stumm an der eingebauten Default-Regel ab und der rote Filter
-bleibt leer. Die Regel ändert nichts am Verhalten der Firewall – sie blockt, was ohnehin
-geblockt wird, und schreibt es ins Syslog. Policy Engine → Zone-Based Firewall → *Create Policy*:
+Without it, scanners silently hit the built-in default rule and the red filter stays empty. The rule
+doesn't change firewall behavior, it blocks what is blocked anyway and logs it.
+Policy Engine → Zone-Based Firewall → *Create Policy*:
 
-| Feld | Wert |
+| Field | Value |
 |---|---|
-| Name | `Anklopfer loggen` |
+| Name | `Log scanners` |
 | Source Zone | External |
 | Destination Zone | Gateway |
 | Action | Block |
 | Protocol | TCP |
-| Connection State | nur *New* |
-| Syslog Logging | an |
+| Connection State | *New* only |
+| Syslog Logging | on |
 
-Optional dieselbe Regel noch einmal mit Destination Zone *Internal*. DHCP, IPv6 und WireGuard laufen
-über UDP/ICMP, Antworten auf deine Verbindungen sind *Established* – die Regel kann nichts
-kaputtmachen. Zurück mit einem Klick auf *Deaktivieren*.
+You can add the same rule with Destination Zone *Internal*. DHCP, IPv6 and WireGuard use UDP/ICMP and
+replies to your own connections are *Established*, so the rule can't break anything. Undo with *Disable*.
 
-Syslog-Logging nur auf **Block**-Regeln einschalten. Logs von Erlauben-Regeln werden zwar am
-Regelnamen (`-A-`, „allow“, „accept“) erkannt und verworfen, sicherer ist es aber, sie gar nicht
-erst zu schicken.
+Only enable syslog logging on **block** rules. Allow rules are recognized by name (`-A-`, "allow",
+"accept") and dropped, but it's cleaner not to send them.
 
-**Region Blocking (CN/RU):** Ob UniFi die Treffer der Region-Sperre selbst ins Syslog schreibt,
-hängt von der Firmware ab. Tut es das nicht, greift die Sperre vor deiner Regel und CN/RU fehlen
-bei den roten Bögen. Alles andere funktioniert trotzdem.
+**Region blocking (CN/RU):** whether UniFi logs region-block hits depends on the firmware. If it
+doesn't, the block happens before your rule and CN/RU won't appear as red arcs. Everything else still works.
 
----
+## 4. Test
 
-## 4. Testen
+From the host:
 
-Vom Host:
 ```bash
 pct enter <LXC ID>
 ./lagezentrum.sh test
 ```
 
-Schickt einen Test-Flow und eine Test-Syslog-Zeile durch die ganze Kette und prüft, ob sie in
-der Historie landen (inkl. GeoIP). Danach:
+Sends a test flow and a test syslog line through the whole chain and checks they arrive in the
+history (incl. GeoIP). Then:
 
-1. `http://<LXC-IP>:8080/?demo` – erst die Login-Seite, nach der Anmeldung der Globus mit Beispieldaten, ganz ohne UniFi
-2. `http://<LXC-IP>:8080` – oben links muss **Live** mit grünem Punkt stehen
-3. Echte Flows brauchen nach dem Einschalten im UniFi etwa eine Minute (IPFIX-Templates).
+1. `http://<LXC-IP>:8080/?demo` shows the login page, then the globe with sample data, no UniFi needed
+2. `http://<LXC-IP>:8080` should show **Live** with a green dot in the top left
+3. Real flows take about a minute after enabling them in UniFi (IPFIX templates)
 
----
+## Usage
 
-## Bedienung
+![Flat map](docs/flat-map.png)
 
 | | |
 |---|---|
-| **⚙ Einstellungen** | *Gleichmäßig abspielen* (Standard an): Das Gateway schickt Flows gebündelt alle paar Sekunden. Das Dashboard puffert sie und spielt sie im echten Takt ab – mit ein paar Sekunden Versatz, den es selbst misst. **Oberfläche:** Farbschema (Nachtblau, Graphit, Schwarz/OLED), Richtungsfarben (Standard oder farbenblind-freundlich), Schriftgröße, Deckkraft der Leisten, Statistik und Ticker einzeln ausblendbar. **Karte:** Globus oder flache Karte, automatische Drehung an/aus mit Geschwindigkeit, Oberfläche Nachtlichter/schlicht, Relief, Sternenhimmel, Atmosphäre, Ländergrenzen, Ländereinfärbung, Hotspots, Beschriftung Zuhause, Bögen kräftig/dezent, Bögen pro Sekunde und Bogenhöhe. *Ansicht auf Zuhause* und *Alles zurücksetzen*. Alles merkt sich der Browser. Ganz unten: *Abmelden* (nur dieser Browser). |
-| **Filter-Chips** | Raus / Rein (an), Abgewehrt / Intern (aus), DNS (aus). Die Auswahl merkt sich der Browser. |
-| **Ticker** | Pro Verbindung Upload ↑, Download ↓ und Dauer. Beim Überfahren: ✎ Namen vergeben, Dossier zu Gerät, Land, Firma oder IP. Klick zoomt zum Ort; Doppelklick öffnet den Verlauf dieser IP. Oben: Verbindungen und Datenmenge pro Minute. |
-| **Linke Spalte** | 24-h-Zähler mit Datenvolumen, Anzahl Ziele/Firmen/Länder/Geräte, Stundengrafik (Klick auf den Titel schaltet zwischen Verbindungen und Datenmenge um), Top-Ziele, Länder, Dienste, größte und längste Verbindungen, Geräte. Länder, Firmen und Geräte öffnen ihr Dossier, der Rest den Verlauf. |
-| **Globus / Karte** | Länder sind nach Verkehr der letzten 24 h eingefärbt (abschaltbar). Klick auf ein Land oder einen Hotspot-Punkt öffnet das Länder-Dossier. Die flache Karte (⚙ → Karte → Ansicht) zeigt dasselbe als Plattkarte: Ziehen verschiebt, Mausrad zoomt. Globus und Karte laden beim Hineinzoomen detailliertere Grenzen (1:50m) und schärfere Textur-Kacheln, jeweils nur für den sichtbaren Ausschnitt; Punkte, Bögen und Beschriftung wachsen dabei nicht mit. |
-| **Dossier** | Für ein Land, ein Gerät, eine Firma oder eine einzelne IP: Kennzahlen (Verbindungen, Datenmenge, IPs, Geräte, erster/letzter Kontakt, Abgewehrt), Zeitachse, Top-Listen und alle Verbindungspaare **Quelle → Ziel** mit Dienst, Anzahl und Datenmenge. Zeitraum 1 h bis 30 Tage. Klick auf ein Paar öffnet die Einzelverbindungen. |
-| **Länder** | Alle Länder als sortierbare Tabelle (Verbindungen, Daten, Geräte, IPs, Abgewehrt) – Klick öffnet das Dossier. |
-| **Geräte** | Alle Adressen mit Verkehr, Namen vergeben oder löschen (✎), auch für externe IPs (*+ Name für IP*, z. B. dein VPS). Namen gelten sofort im Dashboard, für alle neuen Einträge der Historie, und die Suche nach einem Namen findet auch ältere Einträge dieser IP. |
-| **Erstkontakt** | Meldung oben, wenn ein Gerät ein Land oder eine Firma zum ersten Mal seit 30 Tagen kontaktiert (abschaltbar; startet, sobald es einen Tag Historie gibt). |
-| **Verlauf** (Taste `/`) | Volltextsuche über IP, Gerät, Land, Stadt, Provider – oder direkt LogsQL. |
+| **⚙ Settings** | *Smooth playback* (default on): the gateway sends flows in batches every few seconds; the dashboard buffers them and replays them in real time with a few seconds of measured delay. **Interface:** color scheme (night blue, graphite, black/OLED), direction colors (standard or colorblind-friendly), font size, panel opacity, hide stats or ticker. **Map:** globe or flat map, auto-rotation and speed, night lights or plain surface, relief, stars, atmosphere, borders, country shading, hotspots, home label, arc style, arcs per second, arc height. *Reset view* and *Reset all*. Stored in the browser. At the bottom: *Log out* (this browser only). |
+| **Filter chips** | Out / In (on), Blocked / Internal (off), DNS (off). Stored in the browser. |
+| **Ticker** | Upload ↑, download ↓ and duration per connection. On hover: ✎ rename, dossier for device, country, company or IP. Click zooms to the location, double-click opens the history for that IP. Header shows connections and volume per minute. |
+| **Left panel** | 24 h counters with volume, number of destinations/companies/countries/devices, hourly chart (click the title to switch between connections and volume), top destinations, countries, services, largest and longest connections, devices. Countries, companies and devices open their dossier, the rest opens the history. |
+| **Globe / map** | Countries are shaded by traffic in the last 24 h. Click a country or hotspot to open its dossier. The flat map (⚙ → Map → View) pans by dragging and zooms with the wheel. Both load finer borders (1:50m) and sharper texture tiles when zoomed in, only for the visible area. |
+| **Dossier** | For a country, device, company or IP: key numbers (connections, volume, IPs, devices, first/last seen, blocked), timeline, top lists and all **source → destination** pairs with service, count and volume. Range 1 h to 30 days. Click a pair for the individual connections. |
+| **Countries** | All countries as a sortable table. Click opens the dossier. |
+| **Devices** | All addresses with traffic. Add or remove names (✎), also for external IPs (*+ Name für IP*, e.g. your VPS). Names apply immediately in the dashboard and to new history entries, and searching a name also finds older entries for that IP. |
+| **First contact** | Notification when a device contacts a country or company for the first time in 30 days (can be turned off; starts once there's a day of history). |
+| **History** (key `/`) | Full-text search over IP, device, country, city, provider, or plain LogsQL. |
 
-Beispiele für die Suche:
+![History](docs/history.png)
+
+Search examples:
 
 ```
-MacBook                              Wortsuche
-r_country:CN                         ein Feld
-dir:blocked dport:22                 mehrere Felder
+MacBook                              word search
+r_country:CN                         one field
+dir:blocked dport:22                 several fields
 r_org:"Google LLC" local_name:iPhone
-dport:443 | stats by (local_name) sum(bytes) bytes     eigene Auswertung mit Pipes
+dport:443 | stats by (local_name) sum(bytes) bytes     custom query with pipes
 ```
 
-Felder: `dir` (out/in/blocked/internal), `leg`, `proto`, `local_ip`, `local_name`, `remote_ip`,
+Fields: `dir` (out/in/blocked/internal), `leg`, `proto`, `local_ip`, `local_name`, `remote_ip`,
 `remote_name`, `sport`, `dport`, `bytes`, `packets`, `duration_ms`, `rule`, `r_country`, `r_country_name`,
-`r_city`, `r_org`, `r_asn`, `in_if`, `out_if`. Für Profi-Auswertungen gibt es die VictoriaLogs-Oberfläche unter
-`http://<LXC-IP>:8080/select/vmui/`.
+`r_city`, `r_org`, `r_asn`, `in_if`, `out_if`. The full VictoriaLogs UI is at `http://<LXC-IP>:8080/select/vmui/`.
 
-URL-Optionen: `?demo` (Beispieldaten), `?lite` (für schwache Geräte wie einen Pi-Kiosk: ohne
-Relief, Sternenhimmel und Länderflächen, weniger Bögen; die flache Karte bleibt bei der Basistextur).
+URL options: `?demo` (sample data), `?lite` (for weak devices like a Pi kiosk: no relief, stars or
+country fills, fewer arcs).
 
----
+![Settings](docs/settings.png)
 
-## Was UniFi exportiert (und was nicht)
+## What UniFi exports
 
-Ubiquiti dokumentiert nicht genau, welche Verbindungen per NetFlow/IPFIX rausgehen. Stand der Beobachtung:
+Ubiquiti doesn't document exactly which connections go out via NetFlow/IPFIX. What we've seen so far:
 
-- **„Rein“ bleibt bei dir leer, und das ist richtig.** Rein gibt es nur, wenn von außen etwas bei dir
-  erreichbar ist (Portfreigabe). Der Cloudflare-Tunnel baut seine Verbindung von innen nach außen auf –
-  er erscheint als „raus“ zu Cloudflare (Port 7844).
-- **Verkehr zum Gateway selbst** (DNS an `10.37.x.1`, der WireGuard-Server des UCG) taucht in den Exporten
-  bisher nicht auf. Damit fehlen auch eingehende VPN-Verbindungen.
-- **VPN-Clients** stecken in einem eigenen Netz, das in der NetFlow-Auswahl nicht wählbar ist – ihr
-  Verkehr wird nicht exportiert.
-- **Zwischen VLANs:** noch offen. Test zu Hause: von einem Gerät ein Gerät in einem anderen VLAN anpingen,
-  danach Filter „Intern“ einschalten. Zur Diagnose speichert die Pipeline die Interface-Nummern:
-  `_time:24h kind:flow | stats by (in_if, out_if, dir) count()` im Verlauf zeigt, über welche Wege
-  das Gateway überhaupt exportiert.
-- Einige Firmware-Versionen hatten Fehler beim Export (Berichte zu Network 9.3.45 und 9.4.17 in der
-  Ubiquiti-Community). Wenn plötzlich weniger kommt: Firmware-Version prüfen.
+- **Inbound stays empty, and that's correct.** Inbound only exists if something is reachable from
+  outside (port forward). A Cloudflare tunnel connects from inside, so it shows as outbound to
+  Cloudflare (port 7844).
+- **Traffic to the gateway itself** (DNS to `10.37.x.1`, the UCG's WireGuard server) isn't exported.
+  So incoming VPN connections are missing too.
+- **VPN clients** live in a separate network that can't be selected for NetFlow, so their traffic isn't exported.
+- **Between VLANs:** still unclear. To test, ping a device in another VLAN and enable the Internal filter.
+  The pipeline stores interface numbers for this: `_time:24h kind:flow | stats by (in_if, out_if, dir) count()`
+  in the history shows which paths the gateway exports at all.
+- Some firmware versions had export bugs (reports for Network 9.3.45 and 9.4.17 in the Ubiquiti
+  community). If data suddenly drops, check the firmware version.
 
----
+## Operation
 
-## Betrieb
-
-**Update auf eine neue Version** – bei Installation über `create-lxc.sh` (Variante A) auf dem Proxmox-Host:
+**Updating** (option A install), on the Proxmox host:
 
 ```bash
 cd /root/unifi-HQ && git pull
-./proxmox/update-lxc.sh            # findet den CT mit Hostname "lagezentrum", sonst: ./proxmox/update-lxc.sh <CTID>
+./proxmox/update-lxc.sh            # finds the CT named "lagezentrum", otherwise: ./proxmox/update-lxc.sh <CTID>
 ```
 
-Das kopiert den neuen Stand in den Container, baut neu und macht den Selbsttest. `.env`,
-`hosts.csv`, GeoIP-Daten, Passwort und Historie bleiben unangetastet. Bei Variante B (Git im
-Container): `cd /opt/lagezentrum && git pull && docker compose up -d --build && docker compose restart collector caddy`.
+Copies the new version into the container, rebuilds and runs the self-test. `.env`, `hosts.csv`,
+GeoIP data, password and history are kept. Option B (git inside the container):
+`cd /opt/lagezentrum && git pull && docker compose up -d --build && docker compose restart collector caddy`.
 
-**Erstes Update auf die Version mit Login:** Bis ein Passwort gesetzt ist, bleibt das Dashboard
-wie bisher offen (das Update-Skript weist darauf hin). Einmal im Container setzen:
+**First update to the version with login:** the dashboard stays open until a password is set
+(the update script tells you). Set it once inside the container:
 
 ```bash
 pct enter <LXC ID>
 cd /opt/lagezentrum && ./lagezentrum.sh password
 ```
 
-Ein altes Basic Auth (Browser-Passwortfenster aus früheren Versionen) entfernt `password` dabei automatisch.
+This also removes an old basic auth setup from earlier versions.
 
 ### Login
 
-Das Dashboard fragt einmal nach dem Passwort und merkt sich die Anmeldung in einem Cookie. Das
-gilt 400 Tage (mehr erlauben Browser nicht) und verlängert sich bei jeder Nutzung von selbst –
-ein Kiosk oder ein Browser, der das Dashboard regelmäßig öffnet, bleibt also praktisch dauerhaft angemeldet.
+The dashboard asks for the password once and keeps the session in a cookie for 400 days (the browser
+maximum), renewed on every use. A kiosk that opens the dashboard regularly stays signed in.
 
 ```bash
-./lagezentrum.sh password          # Passwort setzen oder ändern (meldet alle Browser ab)
-./lagezentrum.sh password logout   # alle Browser abmelden, Passwort bleibt
-./lagezentrum.sh password off      # Login ausschalten – jeder im LAN sieht das Dashboard
+./lagezentrum.sh password          # set or change password (signs out all browsers)
+./lagezentrum.sh password logout   # sign out all browsers, keep password
+./lagezentrum.sh password off      # disable login, anyone on the LAN can see the dashboard
 ```
 
-Geschützt ist alles: Dashboard, Live-Stream (`/ws`), Historie (`/select`, auch die VictoriaLogs-Oberfläche),
-Namens-API und `config.json`. Ohne Anmeldung landen Seitenaufrufe auf `/login.html`, alles andere
-bekommt `401`. Frei erreichbar sind nur die Login-Seite selbst und `/vendor/` (globe.gl, Texturen,
-Schriften – keine Daten). Interne Dienste wie VictoriaLogs und der Live-Stream hören weiterhin nur
-auf `127.0.0.1`; der Selbsttest und der Collector sprechen sie direkt an, ohne Login.
+Everything is protected: dashboard, live stream (`/ws`), history (`/select`, including the VictoriaLogs UI),
+names API and `config.json`. Without a session, pages redirect to `/login.html` and everything else
+returns `401`. Only the login page and `/vendor/` (globe.gl, textures, fonts, no data) are public.
+Internal services still listen on `127.0.0.1` only; the self-test and collector talk to them directly.
 
 ```bash
-./lagezentrum.sh status      # Container, RAM, Plattenplatz, Ereignisse der letzten Stunde
-./lagezentrum.sh update      # neue Images ziehen und neu starten
-./lagezentrum.sh geoip       # GeoIP sofort aktualisieren (läuft sonst am 3. jedes Monats)
-./lagezentrum.sh logs        # Logs verfolgen
+./lagezentrum.sh status      # containers, RAM, disk, events in the last hour
+./lagezentrum.sh update      # pull new images and restart
+./lagezentrum.sh geoip       # update GeoIP now (otherwise on the 3rd of each month)
+./lagezentrum.sh logs        # follow logs
 ```
 
-- **Aufbewahrung:** `RETENTION` und `MAX_DISK` in der `.env` – was zuerst erreicht ist, gilt.
-- **WAN-IP geändert:** `.env` anpassen, `docker compose up -d`. Bis dahin werden Flows ohne
-  erkennbar lokale Seite trotzdem als „raus“ gewertet.
-- **Versionen** sind festgenagelt (Vector 0.58.0, GoFlow2 v2.2.7, VictoriaLogs v1.53.0, Caddy 2.11).
-  Hochziehen: Versionen in `docker-compose.yml` bzw. `collector/Dockerfile` ändern, dann `update`.
-  Achtung: `netsampler/goflow2:latest` zeigt auf die alte Version 1.x mit anderem JSON-Format.
-- **Backup:** Configs liegen im Git (`.env` und `config/hosts.csv` sind bewusst ausgenommen –
-  die sichern). Die Historie ist entbehrlich.
+- **Retention:** `RETENTION` and `MAX_DISK` in `.env`, whichever is hit first.
+- **WAN IP changed:** update `.env`, `docker compose up -d`. Until then, flows without a recognizable
+  local side still count as outbound.
+- **Versions** are pinned (Vector 0.58.0, GoFlow2 v2.2.7, VictoriaLogs v1.53.0, Caddy 2.11). To bump,
+  edit `docker-compose.yml` or `collector/Dockerfile`, then `update`. Note: `netsampler/goflow2:latest`
+  points to the old 1.x with a different JSON format.
+- **Backup:** configs are in git. `.env` and `config/hosts.csv` are excluded on purpose, back those up.
+  The history is expendable.
 
----
+## Security
 
-## Sicherheit
+- **LAN only:** Caddy only answers clients in `ALLOWED_CLIENTS` (default: 10/8, 172.16/12, 192.168/16,
+  fd00::/8, loopback). Everyone else gets the connection dropped.
+- **No tunnel:** requests with a `Cf-Connecting-Ip` header (Cloudflare Tunnel) are rejected, even if
+  `cloudflared` runs on the LAN. Don't put the dashboard behind a tunnel: `/select` would expose all
+  your connection data.
+- **Sender check:** NetFlow and syslog are only accepted from private addresses, and with
+  `ALLOWED_SENDERS` only from the gateway.
+- **Internal services** (VictoriaLogs, live stream, GoFlow2 metrics) listen on `127.0.0.1` only. Caddy
+  only exposes the read-only `/select` part of VictoriaLogs.
+- **No Docker socket, no external CDNs:** globe.gl, textures and fonts are in `web/vendor/`. The browser
+  loads nothing from third parties (strict Content Security Policy).
+- **Names API:** anyone allowed to open the dashboard can set names via `/api/names`, i.e. only signed-in
+  LAN clients. The API validates IP and name, only accepts same-origin JSON and only writes
+  `config/hosts.csv`. Its only privilege is sending the reload signal to Vector.
+- **Login:** `./lagezentrum.sh password` (see [Login](#login)). Caddy checks every request with the API
+  (`forward_auth`). The password is stored only as a PBKDF2 hash (600,000 rounds, SHA-256) in `.env`; the
+  session cookie is signed with `AUTH_SECRET` (HMAC-SHA256), `HttpOnly` and `SameSite=Lax`. A new password
+  or `password logout` invalidates all cookies. Brute force: each failed attempt costs one second, after
+  5 failures the address is locked for 1 minute, doubling each time (max 15 minutes).
+  The cookie isn't `Secure` because the dashboard runs over plain HTTP on the LAN. Anyone who can sniff
+  LAN traffic can read the cookie. Fine for a home network; guests and IoT belong in their own VLAN anyway.
 
-- **Nur LAN:** Caddy beantwortet nur Clients aus `ALLOWED_CLIENTS` (Standard: private Bereiche
-  10/8, 172.16/12, 192.168/16, fd00::/8, Loopback). Alle anderen bekommen die Verbindung gekappt.
-- **Kein Tunnel:** Anfragen mit `Cf-Connecting-Ip`-Header (Cloudflare Tunnel) werden abgewiesen –
-  auch wenn `cloudflared` selbst im LAN steht. Das Dashboard bitte nicht in den Tunnel hängen:
-  `/select` liefert sonst jedem deine kompletten Verbindungsdaten.
-- **Absenderprüfung:** NetFlow und Syslog werden nur von privaten Adressen angenommen; mit
-  `ALLOWED_SENDERS` nur vom Gateway selbst.
-- **Interne Dienste** (VictoriaLogs, Live-Stream, GoFlow2-Metriken) hören nur auf `127.0.0.1`.
-  Über Caddy ist von VictoriaLogs nur der lesende Teil `/select` erreichbar.
-- **Kein Docker-Socket**, keine externen CDNs: globe.gl, Texturen und Schriften liegen in
-  `web/vendor/`. Der Browser lädt nichts von Dritten (strikte Content-Security-Policy).
-- **Namens-API:** Über `/api/names` kann jeder, der das Dashboard öffnen darf, Namen setzen – also
-  nur angemeldete Clients aus dem LAN. Die API prüft IP und Namen, nimmt nur
-  JSON von derselben Seite an (Schutz gegen fremde Webseiten im selben Browser) und schreibt nur
-  `config/hosts.csv`. Sie läuft ohne Rechte außer dem Senden des Neuladen-Signals an Vector.
-- **Login:** `./lagezentrum.sh password` (siehe [Login](#login)). Caddy fragt vor jeder Anfrage die
-  API, ob die Sitzung gültig ist (`forward_auth`). Das Passwort liegt nur als PBKDF2-Hash
-  (600 000 Runden, SHA-256) in der `.env`; das Sitzungs-Cookie ist mit `AUTH_SECRET` signiert (HMAC-SHA256),
-  `HttpOnly` und `SameSite=Lax`. Ein neues Passwort oder `password logout` macht alle alten Cookies
-  ungültig. Gegen Durchprobieren: Jeder Fehlversuch kostet eine Sekunde, nach 5 Fehlversuchen ist
-  die Adresse 1 Minute gesperrt, danach jeweils doppelt so lange (höchstens 15 Minuten).
-  Das Cookie ist nicht `Secure`, weil das Dashboard im LAN über einfaches HTTP läuft – wer den
-  LAN-Verkehr mitlesen kann, kann auch das Cookie mitlesen. Für ein Heimnetz ist das vertretbar;
-  Gäste und IoT-Geräte gehören ohnehin in ein eigenes VLAN.
+## Resources
 
----
+Measured with synthetic IPFIX:
 
-## Ressourcen
-
-Gemessen im Test mit synthetischem IPFIX:
-
-| Last | CPU (Anteil eines Kerns) | RAM gesamt |
+| Load | CPU (share of one core) | Total RAM |
 |---|---|---|
-| Leerlauf | < 0,1 % | ~180 MB |
-| 100 Flows/s (aktiver Haushalt) | ~3 % Vector + ~2 % GoFlow2 | ~230 MB |
-| 500 Flows/s | ~15 % Vector + ~9 % GoFlow2 | ~230 MB |
+| Idle | < 0.1 % | ~180 MB |
+| 100 flows/s (busy household) | ~3 % Vector + ~2 % GoFlow2 | ~230 MB |
+| 500 flows/s | ~15 % Vector + ~9 % GoFlow2 | ~230 MB |
 
-Kein Flow ging verloren; fällt VictoriaLogs kurz aus, puffert Vector und liefert nach.
-Platten-Schreiblast: nur VictoriaLogs (komprimiert, Flush alle 30 s) und rotierende Docker-Logs
-(max. 10 MB pro Container). Der GeoIP-Bestand braucht ~140 MB RAM im Collector, weil die
-Datenbank für schnelle Abfragen im Speicher liegt. Das Rendern des Globus passiert im Browser,
-nicht auf dem Server; im Hintergrund-Tab pausiert es.
+No flows were lost. If VictoriaLogs goes down briefly, Vector buffers and catches up. Disk writes come
+only from VictoriaLogs (compressed, flushed every 30 s) and rotated Docker logs (max 10 MB per container).
+GeoIP takes ~140 MB RAM in the collector because the database is kept in memory. The globe renders in
+the browser, not on the server, and pauses in background tabs.
 
----
+## Troubleshooting
 
-## Fehlersuche
-
-| Symptom | Ursache | Lösung |
+| Symptom | Cause | Fix |
 |---|---|---|
-| Status *Getrennt* | Collector läuft nicht | `docker compose ps`, `docker compose logs collector`; fehlt GeoIP: `./lagezentrum.sh geoip` |
-| *Live · seit 2 min keine Daten* | NetFlow kommt nicht an | Collector-IP/Port im UniFi prüfen; `apt -y install tcpdump && tcpdump -ni eth0 udp port 2055` |
-| NetFlow kommt an, aber nichts erscheint | Absender nicht erlaubt | `ALLOWED_SENDERS` muss die IP sein, von der das Gateway sendet (siehe tcpdump) |
-| Keine roten Bögen | Filter „Abgewehrt“ aus, Syslog fehlt oder Regel ohne Logging | Chip einschalten; `./lagezentrum.sh test`; Regel aus Schritt 3 C prüfen |
-| CN/RU fehlen bei den roten Bögen | Region Blocking greift vor der Regel | siehe Hinweis in 3 C |
-| Viele „rein“ von der eigenen IP | `WAN_IP` veraltet | `.env` anpassen, `docker compose up -d` |
-| Eigene Geräte als Ausland | IPv6-Präfix fehlt | `LOCAL_EXTRA_NETS` setzen |
-| Statistik zeigt *Historie nicht erreichbar* | VictoriaLogs down | `docker compose logs victorialogs` |
-| Dashboard aus dem LAN nicht erreichbar | Client nicht in `ALLOWED_CLIENTS` | z. B. Tailscale (100.64/10) oder öffentliche IPv6 ergänzen |
-| Globus ruckelt auf dem Kiosk-Pi | GPU zu schwach | `?lite` an die URL hängen |
-| Passwort vergessen | – | `./lagezentrum.sh password` setzt ein neues |
-| Login meldet *Zu viele Fehlversuche* | Sperre nach 5 Fehlversuchen | abwarten (höchstens 15 min) oder `docker compose restart api` |
-| Überall *502* | API läuft nicht, ohne sie lässt Caddy niemanden durch | `docker compose ps`, `docker compose logs api` |
-| Login klappt, danach wieder die Login-Seite | Browser blockiert Cookies für die LXC-IP | Cookies für `http://<LXC-IP>:8080` erlauben |
+| Status *Getrennt* (disconnected) | collector not running | `docker compose ps`, `docker compose logs collector`; if GeoIP is missing: `./lagezentrum.sh geoip` |
+| *Live · seit 2 min keine Daten* | NetFlow not arriving | check collector IP/port in UniFi; `apt -y install tcpdump && tcpdump -ni eth0 udp port 2055` |
+| NetFlow arrives but nothing shows | sender not allowed | `ALLOWED_SENDERS` must be the IP the gateway sends from (see tcpdump) |
+| No red arcs | Blocked filter off, no syslog, or rule without logging | enable the chip; `./lagezentrum.sh test`; check rule 3C |
+| CN/RU missing from red arcs | region blocking hits before the rule | see note in 3C |
+| Lots of inbound from your own IP | `WAN_IP` outdated | update `.env`, `docker compose up -d` |
+| Own devices shown as foreign | IPv6 prefix missing | set `LOCAL_EXTRA_NETS` |
+| Stats show *Historie nicht erreichbar* | VictoriaLogs down | `docker compose logs victorialogs` |
+| Dashboard unreachable from LAN | client not in `ALLOWED_CLIENTS` | add e.g. Tailscale (100.64/10) or public IPv6 |
+| Globe stutters on a Pi kiosk | weak GPU | append `?lite` to the URL |
+| Forgot password | | `./lagezentrum.sh password` sets a new one |
+| Login says *Zu viele Fehlversuche* | locked after 5 failures | wait (max 15 min) or `docker compose restart api` |
+| *502* everywhere | API not running, Caddy lets no one through without it | `docker compose ps`, `docker compose logs api` |
+| Login works, then back to login page | browser blocks cookies for the LXC IP | allow cookies for `http://<LXC-IP>:8080` |
 
-Erlaubte Regeln werden am Namen erkannt (`-A-`, „allow“, „accept“). Taucht in deinen Logs ein
-anderes Muster auf, ist das eine Zeile im `blocked`-Transform in `collector/vector.yaml`.
+Allow rules are recognized by name (`-A-`, "allow", "accept"). If your logs use a different pattern,
+it's one line in the `blocked` transform in `collector/vector.yaml`.
 
----
-
-## Dateien
+## Files
 
 ```
-docker-compose.yml        Container, Härtung, RAM-Limits, Log-Rotation
-.env.example              Vorlage für .env (setup kopiert sie)
-install.sh                Installation im LXC: Pakete, Docker, Projekt, Setup, Selbsttest
-proxmox/create-lxc.sh     auf dem Proxmox-Host: LXC anlegen und install.sh darin starten
-proxmox/update-lxc.sh     auf dem Proxmox-Host: neuen Stand in den LXC kopieren und neu starten
-lagezentrum.sh            setup · test · status · geoip · password (Login) · update · logs
-collector/Dockerfile      Vector + GoFlow2 in einem Image
-collector/vector.yaml     Pipeline: Klassifizierung, Syslog-Parser, GeoIP, Senken
-config/hosts.example.csv  Vorlage für Gerätenamen
-caddy/Caddyfile           Webserver, LAN-Sperre, Sicherheits-Header
-caddy/auth/               nur noch für ein altes Basic Auth früherer Versionen
-scripts/geoip-update.sh   GeoIP-Download (läuft im geoip-Container)
-api/                      Login + Namens-API (Go, nur Standardbibliothek)
-web/                      Dashboard (index.html, app.js, app.css), Login-Seite (login.*) + vendor/ (globe.gl, Texturen, Schriften)
-geoip/                    heruntergeladene Datenbanken (nicht im Git)
+docker-compose.yml        containers, hardening, RAM limits, log rotation
+.env.example              template for .env (copied by setup)
+install.sh                install inside the LXC: packages, Docker, project, setup, self-test
+proxmox/create-lxc.sh     on the Proxmox host: create LXC and run install.sh in it
+proxmox/update-lxc.sh     on the Proxmox host: copy new version into the LXC and restart
+lagezentrum.sh            setup · test · status · geoip · password · update · logs
+collector/Dockerfile      Vector + GoFlow2 in one image
+collector/vector.yaml     pipeline: classification, syslog parser, GeoIP, sinks
+config/hosts.example.csv  template for device names
+caddy/Caddyfile           web server, LAN restriction, security headers
+caddy/auth/               only for old basic auth from earlier versions
+scripts/geoip-update.sh   GeoIP download (runs in the geoip container)
+api/                      login + names API (Go, standard library only)
+web/                      dashboard, login page, vendor/ (globe.gl, textures, fonts)
+docs/                     screenshots
+geoip/                    downloaded databases (not in git)
 ```
 
-IP-Geolokation: [DB-IP.com](https://db-ip.com) Lite, CC BY 4.0. globe.gl: MIT. IBM Plex: SIL OFL 1.1.
-Flaggen: Twemoji Country Flags (Code MIT, Grafiken [Twemoji](https://github.com/twitter/twemoji) CC BY 4.0) –
-damit erscheinen Flaggen auch unter Windows. Ländergrenzen: [Natural Earth](https://www.naturalearthdata.com) 1:110m und 1:50m, gemeinfrei.
-Nachttextur: [NASA Earth Observatory, Black Marble 2016](https://earthobservatory.nasa.gov/features/NightLights)
-(Suomi NPP VIIRS), gemeinfrei.
+IP geolocation: [DB-IP.com](https://db-ip.com) Lite, CC BY 4.0. globe.gl: MIT. IBM Plex: SIL OFL 1.1.
+Flags: Twemoji Country Flags (code MIT, graphics [Twemoji](https://github.com/twitter/twemoji) CC BY 4.0),
+so flags also show on Windows. Borders: [Natural Earth](https://www.naturalearthdata.com) 1:110m and 1:50m,
+public domain. Night texture: [NASA Earth Observatory, Black Marble 2016](https://earthobservatory.nasa.gov/features/NightLights)
+(Suomi NPP VIIRS), public domain.
