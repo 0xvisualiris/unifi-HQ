@@ -1,0 +1,127 @@
+name: Docker image
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build + self-test (all-in-one)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build image (amd64, load into Docker)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          tags: unifi-hq:ci
+          cache-from: type=gha,scope=all-in-one
+          cache-to: type=gha,scope=all-in-one,mode=max
+
+      - name: hash-password works as a one-off command
+        run: |
+          hash=$(printf 'correct horse battery\n' | docker run --rm -i unifi-hq:ci hash-password)
+          echo "$hash" | grep -q '^pbkdf2-sha256:' || { echo "unexpected: $hash"; exit 1; }
+
+      - name: Start container (read-only, like docker/compose.yml)
+        run: |
+          docker run -d --name unifi-hq --network host --read-only --tmpfs /tmp:size=32m \
+            --cap-drop ALL --cap-add CHOWN --cap-add DAC_OVERRIDE --cap-add FOWNER \
+            --cap-add SETUID --cap-add SETGID --cap-add KILL \
+            --security-opt no-new-privileges:true \
+            -e AUTH_PASSWORD='correct horse battery' -e PUID=568 -e PGID=568 \
+            -v unifi-hq-data:/data unifi-hq:ci
+
+      - name: Wait until healthy
+        run: |
+          for i in $(seq 1 60); do
+            s=$(docker inspect -f '{{.State.Health.Status}}' unifi-hq 2>/dev/null || echo gone)
+            [ "$s" = healthy ] && exit 0
+            [ "$(docker inspect -f '{{.State.Running}}' unifi-hq)" = true ] || break
+            sleep 5
+          done
+          docker logs unifi-hq; exit 1
+
+      - name: Self-test (NetFlow, syslog, GeoIP, login)
+        run: docker exec unifi-hq lz test
+
+      - name: Login with the password
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' -c jar -H 'Content-Type: application/json' \
+            -H 'Origin: http://127.0.0.1:8080' -d '{"password":"correct horse battery"}' http://127.0.0.1:8080/auth/login)
+          [ "$code" = 200 ] || { echo "login: HTTP $code"; exit 1; }
+          code=$(curl -s -o /dev/null -w '%{http_code}' -b jar http://127.0.0.1:8080/)
+          [ "$code" = 200 ] || { echo "dashboard with session: HTTP $code"; exit 1; }
+
+      - name: Restart keeps data and sessions
+        run: |
+          docker restart unifi-hq
+          for i in $(seq 1 30); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' unifi-hq)" = healthy ] && break; sleep 5
+          done
+          code=$(curl -s -o /dev/null -w '%{http_code}' -b jar http://127.0.0.1:8080/)
+          [ "$code" = 200 ] || { echo "session lost after restart: HTTP $code"; exit 1; }
+          docker exec unifi-hq ls -ln /data
+
+      - name: Logs
+        if: always()
+        run: docker logs unifi-hq 2>&1 | tail -100 || true
+
+  publish:
+    name: Publish to GHCR (amd64 + arm64)
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-qemu-action@v4
+
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/unifi-hq
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=all-in-one-multi
+          cache-to: type=gha,scope=all-in-one-multi,mode=max
